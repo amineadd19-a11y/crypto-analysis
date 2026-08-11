@@ -9,51 +9,38 @@ localStorage.getItem("cv_favorites") || "[]"
 )
 };
 
-function get(selector) {
+function $(selector) {
 return document.querySelector(selector);
 }
 
 function formatPrice(value) {
 const n = Number(value);
 
-if (!Number.isFinite(n)) {
-return "--";
-}
+if (!Number.isFinite(n)) return "--";
 
 if (n >= 1000) {
-return (
-"$" +
-n.toLocaleString("en-US", {
+return "$" + n.toLocaleString("en-US", {
 maximumFractionDigits: 0
-})
-);
+});
 }
 
 if (n >= 1) {
-return (
-"$" +
-n.toLocaleString("en-US", {
+return "$" + n.toLocaleString("en-US", {
 minimumFractionDigits: 2,
 maximumFractionDigits: 2
-})
-);
+});
 }
 
-return (
-"$" +
-n.toLocaleString("en-US", {
+return "$" + n.toLocaleString("en-US", {
 minimumFractionDigits: 4,
 maximumFractionDigits: 8
-})
-);
+});
 }
 
 function formatPercent(value) {
 const n = Number(value);
 
-if (!Number.isFinite(n)) {
-return "--";
-}
+if (!Number.isFinite(n)) return "--";
 
 return (
 (n >= 0 ? "+" : "") +
@@ -62,53 +49,34 @@ n.toFixed(2) +
 );
 }
 
-function formatLargeNumber(value) {
+function formatLarge(value) {
 const n = Number(value);
 
-if (!Number.isFinite(n)) {
-return "--";
+if (!Number.isFinite(n)) return "--";
+
+if (n >= 1e12) {
+return "$" + (n / 1e12).toFixed(2) + "T";
 }
 
-if (n >= 1000000000000) {
-return (
-"$" +
-(n / 1000000000000).toFixed(2) +
-"T"
-);
+if (n >= 1e9) {
+return "$" + (n / 1e9).toFixed(2) + "B";
 }
 
-if (n >= 1000000000) {
-return (
-"$" +
-(n / 1000000000).toFixed(2) +
-"B"
-);
+if (n >= 1e6) {
+return "$" + (n / 1e6).toFixed(2) + "M";
 }
 
-if (n >= 1000000) {
-return (
-"$" +
-(n / 1000000).toFixed(2) +
-"M"
-);
+return "$" + n.toLocaleString("en-US");
 }
 
-return (
-"$" +
-n.toLocaleString("en-US")
-);
-}
+function showLoading(text) {
+const grid = $("#coinGrid");
 
-function showLoading(message) {
-const grid = get("#coinGrid");
-
-if (!grid) {
-return;
-}
+if (!grid) return;
 
 grid.innerHTML =
 '<div class="loading-card">' +
-message +
+text +
 "</div>";
 }
 
@@ -126,13 +94,12 @@ const response = await fetch(url);
 
 if (!response.ok) {
 throw new Error(
-"CoinGecko error: " +
+"CoinGecko error " +
 response.status
 );
 }
 
-const data =
-await response.json();
+const data = await response.json();
 
 if (!Array.isArray(data)) {
 throw new Error(
@@ -144,11 +111,11 @@ return data;
 }
 
 function renderCoins(coins) {
-const grid = get("#coinGrid");
+const grid = $("#coinGrid");
 
-if (!grid) {
-return;
-}
+if (!grid) return;
+
+grid.innerHTML = "";
 
 if (!coins.length) {
 grid.innerHTML =
@@ -160,8 +127,6 @@ return;
 
 }
 
-grid.innerHTML = "";
-
 coins.forEach(function (coin) {
 const change =
 Number(
@@ -169,103 +134,84 @@ coin.price_change_percentage_24h
 ) || 0;
 
 const card =
-  document.createElement(
-    "article"
-  );
+  document.createElement("article");
 
-card.className =
-  "coin-card";
+card.className = "coin-card";
 
-const isFavorite =
+const favorite =
   state.favorites.includes(
     coin.id
   );
 
-card.innerHTML =
-  '<div class="coin-card-top">' +
+card.innerHTML = `
+  <div class="coin-card-top">
 
-    '<div class="coin-identity">' +
+    <div class="coin-identity">
 
-      '<img ' +
-        'class="coin-logo" ' +
-        'src="' +
-        coin.image +
-        '" ' +
-        'alt="' +
-        coin.name +
-        '"' +
-      ">" +
+      <img
+        class="coin-logo"
+        src="${coin.image}"
+        alt="${coin.name}"
+        loading="lazy"
+      >
 
-      "<div>" +
+      <div>
+        <strong>${coin.name}</strong>
+        <span>
+          ${coin.symbol.toUpperCase()}
+        </span>
+      </div>
 
-        "<strong>" +
-          coin.name +
-        "</strong>" +
+    </div>
 
-        "<span>" +
-          coin.symbol.toUpperCase() +
-        "</span>" +
+    <button
+      class="star-button ${
+        favorite ? "active" : ""
+      }"
+      data-favorite="${coin.id}"
+      type="button"
+    >
+      ${favorite ? "★" : "☆"}
+    </button>
 
-      "</div>" +
+  </div>
 
-    "</div>" +
+  <div class="coin-price">
 
-    '<button ' +
-      'class="star-button' +
-      (isFavorite
-        ? " active"
-        : "") +
-      '" ' +
-      'type="button" ' +
-      'data-favorite="' +
-      coin.id +
-      '"' +
-    ">" +
-
-      (isFavorite
-        ? "★"
-        : "☆") +
-
-    "</button>" +
-
-  "</div>" +
-
-  '<div class="coin-price">' +
-
-    "<strong>" +
-      formatPrice(
+    <strong>
+      ${formatPrice(
         coin.current_price
-      ) +
-    "</strong>" +
+      )}
+    </strong>
 
-    '<span class="' +
-      (change >= 0
+    <span class="${
+      change >= 0
         ? "positive-text"
-        : "negative-text") +
-    '">' +
-      formatPercent(change) +
-    "</span>" +
+        : "negative-text"
+    }">
+      ${formatPercent(change)}
+    </span>
 
-  "</div>" +
+  </div>
 
-  '<div class="coin-card-bottom">' +
+  <div class="coin-card-bottom">
 
-    "<span>Market Cap</span>" +
+    <span>Market Cap</span>
 
-    "<strong>" +
-      formatLargeNumber(
+    <strong>
+      ${formatLarge(
         coin.market_cap
-      ) +
-    "</strong>" +
+      )}
+    </strong>
 
-  "</div>";
+  </div>
+`;
 
 grid.appendChild(card);
 
 card.addEventListener(
   "click",
   function (event) {
-
     if (
       event.target.closest(
         "[data-favorite]"
@@ -278,17 +224,15 @@ card.addEventListener(
   }
 );
 
-const favoriteButton =
+const star =
   card.querySelector(
     "[data-favorite]"
   );
 
-if (favoriteButton) {
-
-  favoriteButton.addEventListener(
+if (star) {
+  star.addEventListener(
     "click",
     function (event) {
-
       event.stopPropagation();
 
       toggleFavorite(
@@ -305,18 +249,14 @@ function toggleFavorite(id) {
 if (
 state.favorites.includes(id)
 ) {
-
 state.favorites =
-  state.favorites.filter(
-    function (item) {
-      return item !== id;
-    }
-  );
-
+state.favorites.filter(
+function (item) {
+return item !== id;
+}
+);
 } else {
-
 state.favorites.push(id);
-
 }
 
 localStorage.setItem(
@@ -338,25 +278,28 @@ updateSelectedCoin(
 coin
 );
 
-loadTradingView(
+const symbol =
 "BINANCE:" +
 coin.symbol.toUpperCase() +
-"USDT"
+"USDT";
+
+loadTradingView(
+symbol
 );
 }
 
 function updateSelectedCoin(coin) {
 const name =
-get(".selected-asset > strong");
+$(".selected-asset > strong");
 
 const symbol =
-get(".selected-asset > span");
+$(".selected-asset > span");
 
 const price =
-get(".chart-price strong");
+$(".chart-price strong");
 
 const change =
-get(".chart-price span");
+$(".chart-price span");
 
 if (name) {
 name.textContent =
@@ -386,9 +329,8 @@ coin.price_change_percentage_7d
 ) || day;
 
 if (change) {
-
 change.textContent =
-  formatPercent(day);
+formatPercent(day);
 
 change.className =
   day >= 0
@@ -403,7 +345,7 @@ day,
 week
 );
 
-updatePrediction(
+updatePredictions(
 coin.current_price,
 day,
 week
@@ -434,36 +376,34 @@ formatPercent(day);
 
 if (rows[2]) {
 rows[2].textContent =
-formatLargeNumber(
+formatLarge(
 coin.total_volume
 );
 }
 
 if (rows[3]) {
-
-const score =
-  Math.max(
-    15,
-    Math.min(
-      85,
-      Math.round(
-        50 +
-        day * 2 +
-        week
-      )
-    )
-  );
+const rsi =
+Math.max(
+15,
+Math.min(
+85,
+Math.round(
+50 +
+day * 2 +
+week
+)
+)
+);
 
 rows[3].textContent =
-  score;
+  rsi;
 
 }
 
 if (rows[4]) {
-
 const momentum =
-  day * 0.4 +
-  week * 0.6;
+day * 0.4 +
+week * 0.6;
 
 if (momentum > 5) {
   rows[4].textContent =
@@ -485,7 +425,7 @@ if (momentum > 5) {
 }
 }
 
-function updatePrediction(
+function updatePredictions(
 price,
 day,
 week
@@ -501,7 +441,7 @@ const momentum =
 day * 0.4 +
 week * 0.6;
 
-const predictions = [
+const values = [
 current *
 (1 + momentum / 100 * 0.35),
 
@@ -522,25 +462,21 @@ function (
 element,
 index
 ) {
-
-    if (
-      predictions[index] !==
-      undefined
-    ) {
-      element.textContent =
-        formatPrice(
-          predictions[index]
-        );
-    }
-  }
+if (
+values[index] !==
+undefined
+) {
+element.textContent =
+formatPrice(
+values[index]
 );
-
+}
+}
+);
 }
 
-function updateOverview(
-coins
-) {
-const bitcoin =
+function updateOverview(coins) {
+const btc =
 coins.find(
 function (coin) {
 return (
@@ -550,7 +486,7 @@ coin.id ===
 }
 );
 
-const ethereum =
+const eth =
 coins.find(
 function (coin) {
 return (
@@ -560,38 +496,34 @@ coin.id ===
 }
 );
 
-if (bitcoin) {
-
+if (btc) {
 document
-  .querySelectorAll(
-    '[data-price="bitcoin"]'
-  )
-  .forEach(
-    function (element) {
-      element.textContent =
-        formatPrice(
-          bitcoin.current_price
-        );
-    }
-  );
-
+.querySelectorAll(
+'[data-price="bitcoin"]'
+)
+.forEach(
+function (element) {
+element.textContent =
+formatPrice(
+btc.current_price
+);
+}
+);
 }
 
-if (ethereum) {
-
+if (eth) {
 document
-  .querySelectorAll(
-    '[data-price="ethereum"]'
-  )
-  .forEach(
-    function (element) {
-      element.textContent =
-        formatPrice(
-          ethereum.current_price
-        );
-    }
-  );
-
+.querySelectorAll(
+'[data-price="ethereum"]'
+)
+.forEach(
+function (element) {
+element.textContent =
+formatPrice(
+eth.current_price
+);
+}
+);
 }
 
 const changes =
@@ -604,16 +536,10 @@ coin.price_change_percentage_24h
 }
 )
 .filter(
-function (value) {
-return Number.isFinite(
-value
-);
-}
+Number.isFinite
 );
 
-if (!changes.length) {
-return;
-}
+if (!changes.length) return;
 
 const average =
 changes.reduce(
@@ -636,7 +562,7 @@ Math.round(
 );
 
 const marketScore =
-get("#marketScore");
+$("#marketScore");
 
 if (marketScore) {
 marketScore.textContent =
@@ -655,14 +581,23 @@ score;
 );
 }
 
-function loadTradingView(
-symbol
-) {
+/* =========================
+TRADINGVIEW
+========================= */
+
+function loadTradingView(symbol) {
 const container =
-get("#tradingview-widget");
+document.getElementById(
+"tradingview-widget"
+);
 
 if (!container) {
+console.error(
+"TradingView container not found"
+);
+
 return;
+
 }
 
 container.innerHTML = "";
@@ -671,6 +606,9 @@ const wrapper =
 document.createElement(
 "div"
 );
+
+wrapper.className =
+"tradingview-widget-container";
 
 wrapper.style.width =
 "100%";
@@ -692,17 +630,28 @@ widget.style.width =
 widget.style.height =
 "100%";
 
+wrapper.appendChild(
+widget
+);
+
+container.appendChild(
+wrapper
+);
+
 const script =
 document.createElement(
 "script"
 );
+
+script.type =
+"text/javascript";
 
 script.src =
 "https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js";
 
 script.async = true;
 
-script.innerHTML =
+script.textContent =
 JSON.stringify({
 autosize: true,
 symbol: symbol,
@@ -711,47 +660,45 @@ timezone: "Etc/UTC",
 theme: "dark",
 style: "1",
 locale: "en",
-enable_publishing: false,
-allow_symbol_change: true,
+backgroundColor:
+"rgba(0,0,0,0)",
+gridColor:
+"rgba(255,255,255,0.06)",
 hide_top_toolbar: false,
 hide_legend: false,
-save_image: false
+allow_symbol_change: true,
+save_image: false,
+hide_volume: false,
+support_host:
+"https://www.tradingview.com"
 });
-
-wrapper.appendChild(
-widget
-);
 
 wrapper.appendChild(
 script
 );
-
-container.appendChild(
-wrapper
-);
 }
+
+/* =========================
+SEARCH
+========================= */
 
 function setupSearch() {
 const input =
-get(
+document.querySelector(
 ".topbar-search input"
 );
 
-if (!input) {
-return;
-}
+if (!input) return;
 
 input.addEventListener(
 "input",
 function () {
-
-  const query =
-    input.value
-      .trim()
-      .toLowerCase();
+const query =
+input.value
+.trim()
+.toLowerCase();
 
   if (!query) {
-
     renderCoins(
       state.coins
     );
@@ -762,12 +709,10 @@ function () {
   const filtered =
     state.coins.filter(
       function (coin) {
-
         return (
           coin.name
             .toLowerCase()
             .includes(query) ||
-
           coin.symbol
             .toLowerCase()
             .includes(query)
@@ -783,26 +728,23 @@ function () {
 );
 }
 
+/* =========================
+SCANNER
+========================= */
+
 function setupScanner() {
 const button =
-get("#runScanner");
+$("#runScanner");
 
-if (!button) {
-return;
-}
+if (!button) return;
 
 button.addEventListener(
 "click",
 function () {
+const result =
+$(".scanner-results");
 
-  const result =
-    get(
-      ".scanner-results"
-    );
-
-  if (!result) {
-    return;
-  }
+  if (!result) return;
 
   if (!state.coins.length) {
     result.innerHTML =
@@ -816,12 +758,10 @@ function () {
       .slice()
       .sort(
         function (a, b) {
-
           return (
             (Number(
               b.price_change_percentage_24h
             ) || 0) -
-
             (Number(
               a.price_change_percentage_24h
             ) || 0)
@@ -835,7 +775,6 @@ function () {
     .slice(0, 10)
     .forEach(
       function (coin) {
-
         const change =
           Number(
             coin.price_change_percentage_24h
@@ -849,45 +788,36 @@ function () {
         row.className =
           "mini-opportunity";
 
-        row.innerHTML =
-          '<div class="mini-opportunity-coin">' +
+        row.innerHTML = `
+          <div class="mini-opportunity-coin">
 
-            "<img " +
-              'src="' +
-              coin.image +
-              '" ' +
-              'width="34" ' +
-              'height="34" ' +
-              'alt=""' +
-            ">" +
+            <img
+              src="${coin.image}"
+              width="34"
+              height="34"
+              alt=""
+            >
 
-            "<div>" +
+            <div>
+              <strong>
+                ${coin.name}
+              </strong>
 
-              "<strong>" +
-                coin.name +
-              "</strong>" +
+              <small>
+                ${coin.symbol.toUpperCase()}
+              </small>
+            </div>
 
-              "<small>" +
-                coin.symbol.toUpperCase() +
-              "</small>" +
+          </div>
 
-            "</div>" +
-
-          "</div>" +
-
-          '<strong class="' +
-            (
-              change >= 0
-                ? "positive-text"
-                : "negative-text"
-            ) +
-          '">' +
-
-            formatPercent(
-              change
-            ) +
-
-          "</strong>";
+          <strong class="${
+            change >= 0
+              ? "positive-text"
+              : "negative-text"
+          }">
+            ${formatPercent(change)}
+          </strong>
+        `;
 
         result.appendChild(
           row
@@ -899,6 +829,10 @@ function () {
 );
 }
 
+/* =========================
+NAVIGATION
+========================= */
+
 function setupNavigation() {
 document
 .querySelectorAll(
@@ -906,22 +840,20 @@ document
 )
 .forEach(
 function (link) {
-
-    link.addEventListener(
-      "click",
-      function () {
-
-        document
-          .querySelectorAll(
-            ".nav-item"
-          )
-          .forEach(
-            function (item) {
-              item.classList.remove(
-                "active"
-              );
-            }
-          );
+link.addEventListener(
+"click",
+function () {
+document
+.querySelectorAll(
+".nav-item"
+)
+.forEach(
+function (item) {
+item.classList.remove(
+"active"
+);
+}
+);
 
         link.classList.add(
           "active"
@@ -933,12 +865,16 @@ function (link) {
 
 }
 
+/* =========================
+MOBILE
+========================= */
+
 function setupMobileMenu() {
 const button =
-get(".mobile-menu");
+$(".mobile-menu");
 
 const sidebar =
-get(".sidebar");
+$(".sidebar");
 
 if (!button || !sidebar) {
 return;
@@ -954,6 +890,10 @@ sidebar.classList.toggle(
 );
 }
 
+/* =========================
+START
+========================= */
+
 async function start() {
 showLoading(
 "Loading live cryptocurrency markets..."
@@ -965,9 +905,8 @@ setupNavigation();
 setupMobileMenu();
 
 try {
-
 state.coins =
-  await loadCoins();
+await loadCoins();
 
 renderCoins(
   state.coins
@@ -980,17 +919,15 @@ updateOverview(
 if (
   state.coins.length
 ) {
-
   selectCoin(
     state.coins[0]
   );
 }
 
 } catch (error) {
-
 console.error(
-  "CryptoVision:",
-  error
+"CryptoVision:",
+error
 );
 
 showLoading(
