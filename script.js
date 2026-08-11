@@ -2,20 +2,14 @@ const API = "https://api.coingecko.com/api/v3";
 
 const state = {
 coins: [],
-favorites: JSON.parse(localStorage.getItem("cv_favorites") || "[]"),
 selected: "bitcoin",
-currency: "usd"
+currency: "usd",
+favorites: JSON.parse(localStorage.getItem("cv_favorites") || "[]")
 };
 
 const $ = (selector) => document.querySelector(selector);
 
-/* =========================================================
-HELPERS
-========================================================= */
-
 function money(value) {
-if (value === null || value === undefined) return "--";
-
 const n = Number(value);
 
 if (!Number.isFinite(n)) return "--";
@@ -40,8 +34,6 @@ maximumFractionDigits: 8
 }
 
 function percent(value) {
-if (value === null || value === undefined) return "--";
-
 const n = Number(value);
 
 if (!Number.isFinite(n)) return "--";
@@ -50,22 +42,23 @@ return "${n >= 0 ? "+" : ""}${n.toFixed(2)}%";
 }
 
 function largeNumber(value) {
-if (!value) return "--";
-
 const n = Number(value);
 
-if (!Number.isFinite(n)) return "--";
+if (!Number.isFinite(n) || n === 0) return "--";
 
-if (n >= 1e12)
+if (n >= 1e12) {
 return "$" + (n / 1e12).toFixed(2) + "T";
+}
 
-if (n >= 1e9)
+if (n >= 1e9) {
 return "$" + (n / 1e9).toFixed(2) + "B";
+}
 
-if (n >= 1e6)
+if (n >= 1e6) {
 return "$" + (n / 1e6).toFixed(2) + "M";
+}
 
-return "$" + n.toLocaleString();
+return "$" + n.toLocaleString("en-US");
 }
 
 function escapeHTML(value) {
@@ -78,9 +71,7 @@ return String(value ?? "")
 }
 
 async function fetchJSON(url) {
-
 const response = await fetch(url, {
-method: "GET",
 headers: {
 Accept: "application/json"
 }
@@ -93,13 +84,13 @@ throw new Error("API Error ${response.status}");
 return response.json();
 }
 
-/* =========================================================
-MARKET DATA
-========================================================= */
-
 async function loadMarketData() {
+const grid = $("#coinGrid");
 
 try {
+if (grid) {
+grid.innerHTML = "<div class="loading-card"> Loading market data... </div>";
+}
 
 const url =
   `${API}/coins/markets` +
@@ -118,18 +109,19 @@ if (!Array.isArray(data)) {
 
 state.coins = data;
 
-renderCoins(state.coins);
+renderCoins(data);
 updateTicker();
 updatePrices();
 updateMarketPulse();
 
-const selectedExists =
-  state.coins.some(
-    coin => coin.id === state.selected
-  );
-
-if (!selectedExists && state.coins.length) {
-  state.selected = state.coins[0].id;
+if (
+  !state.coins.some(
+    (coin) => coin.id === state.selected
+  )
+) {
+  if (state.coins[0]) {
+    state.selected = state.coins[0].id;
+  }
 }
 
 if (state.coins.length) {
@@ -137,178 +129,177 @@ if (state.coins.length) {
 }
 
 } catch (error) {
-
 console.error(
-  "CryptoVision market error:",
-  error
+"CryptoVision market error:",
+error
 );
 
-showError();
+if (grid) {
+  grid.innerHTML = `
+    <div class="loading-card error-card">
+      <strong>Unable to load market data</strong>
+      <small>${escapeHTML(error.message)}</small>
+      <button
+        class="secondary-button"
+        type="button"
+        id="retryMarket"
+      >
+        Retry
+      </button>
+    </div>
+  `;
+
+  const retry = $("#retryMarket");
+
+  if (retry) {
+    retry.addEventListener(
+      "click",
+      loadMarketData
+    );
+  }
+}
 
 }
 }
-
-/* Compatibility with previous versions */
 
 const loadMarket = loadMarketData;
 
-/* =========================================================
-COIN GRID
-========================================================= */
-
 function renderCoins(coins) {
-
 const grid = $("#coinGrid");
 
 if (!grid) return;
 
-grid.innerHTML = "";
-
 if (!coins.length) {
-
-grid.innerHTML = `
-  <div class="loading-card">
-    No cryptocurrency found.
-  </div>
-`;
+grid.innerHTML = "<div class="loading-card"> No cryptocurrency found. </div>";
 
 return;
 
 }
 
-coins.slice(0, 20).forEach(coin => {
+grid.innerHTML = coins
+.slice(0, 20)
+.map((coin) => {
 
-const change =
-  Number(
-    coin.price_change_percentage_24h || 0
-  );
+  const change =
+    Number(
+      coin.price_change_percentage_24h
+    ) || 0;
 
-const positive =
-  change >= 0;
+  const favorite =
+    state.favorites.includes(coin.id);
 
-const favorite =
-  state.favorites.includes(coin.id);
+  return `
+    <article
+      class="coin-card"
+      data-coin="${escapeHTML(coin.id)}"
+    >
 
+      <div class="coin-card-top">
 
-const card =
-  document.createElement("article");
+        <div class="coin-identity">
 
-card.className = "coin-card";
+          <img
+            class="coin-logo"
+            src="${escapeHTML(coin.image)}"
+            alt="${escapeHTML(coin.name)}"
+            loading="lazy"
+          >
 
-card.dataset.coin = coin.id;
+          <div>
+            <strong>
+              ${escapeHTML(coin.name)}
+            </strong>
 
+            <span>
+              ${escapeHTML(
+                coin.symbol.toUpperCase()
+              )}
+            </span>
+          </div>
 
-card.innerHTML = `
+        </div>
 
-  <div class="coin-card-top">
+        <button
+          class="star-button ${
+            favorite ? "active" : ""
+          }"
+          data-favorite="${escapeHTML(
+            coin.id
+          )}"
+          type="button"
+          aria-label="Favorite"
+        >
+          ${favorite ? "★" : "☆"}
+        </button>
 
-    <div class="coin-identity">
+      </div>
 
-      <img
-        class="coin-logo"
-        src="${escapeHTML(coin.image)}"
-        alt="${escapeHTML(coin.name)}"
-        loading="lazy"
-      >
-
-      <div>
+      <div class="coin-price">
 
         <strong>
-          ${escapeHTML(coin.name)}
+          ${money(coin.current_price)}
         </strong>
 
-        <span>
-          ${escapeHTML(
-            coin.symbol.toUpperCase()
-          )}
+        <span
+          class="${
+            change >= 0
+              ? "positive-text"
+              : "negative-text"
+          }"
+        >
+          ${percent(change)}
         </span>
 
       </div>
 
-    </div>
+      <div class="coin-card-bottom">
 
+        <span>Market Cap</span>
 
-    <button
-      class="star-button ${favorite ? "active" : ""}"
-      data-favorite="${escapeHTML(coin.id)}"
-      type="button"
-      aria-label="Favorite"
-    >
-      ${favorite ? "★" : "☆"}
-    </button>
+        <strong>
+          ${largeNumber(coin.market_cap)}
+        </strong>
 
-  </div>
+      </div>
 
+    </article>
+  `;
+})
+.join("");
 
-  <div class="coin-price">
+grid
+.querySelectorAll(".coin-card")
+.forEach((card) => {
 
-    <strong>
-      ${money(coin.current_price)}
-    </strong>
-
-    <span
-      class="${
-        positive
-          ? "positive-text"
-          : "negative-text"
-      }"
-    >
-      ${percent(change)}
-    </span>
-
-  </div>
-
-
-  <div class="coin-card-bottom">
-
-    <span>
-      Market Cap
-    </span>
-
-    <strong>
-      ${largeNumber(coin.market_cap)}
-    </strong>
-
-  </div>
-
-
-  <div class="mini-chart"></div>
-
-`;
-
-
-card.addEventListener(
-  "click",
-  () => selectCoin(coin.id)
-);
-
-
-const favoriteButton =
-  card.querySelector(
-    "[data-favorite]"
+  card.addEventListener(
+    "click",
+    () => {
+      selectCoin(card.dataset.coin);
+    }
   );
 
+});
 
-favoriteButton?.addEventListener(
-  "click",
-  event => {
+grid
+.querySelectorAll("[data-favorite]")
+.forEach((button) => {
 
-    event.stopPropagation();
+  button.addEventListener(
+    "click",
+    (event) => {
 
-    toggleFavorite(coin.id);
+      event.stopPropagation();
 
-  }
-);
+      toggleFavorite(
+        button.dataset.favorite
+      );
 
-
-grid.appendChild(card);
+    }
+  );
 
 });
-}
 
-/* =========================================================
-TICKER
-========================================================= */
+}
 
 function updateTicker() {
 
@@ -321,15 +312,14 @@ if (!ticker) return;
 ticker.innerHTML =
 state.coins
 .slice(0, 10)
-.map(coin => {
+.map((coin) => {
 
     const change =
       Number(
-        coin.price_change_percentage_24h || 0
-      );
+        coin.price_change_percentage_24h
+      ) || 0;
 
     return `
-
       <div class="ticker-item">
 
         <span>
@@ -349,82 +339,52 @@ state.coins
         </strong>
 
       </div>
-
     `;
-
   })
   .join("");
 
 }
 
-/* =========================================================
-BTC / ETH
-========================================================= */
-
 function updatePrices() {
 
-const bitcoin =
-state.coins.find(
-coin => coin.id === "bitcoin"
+["bitcoin", "ethereum"].forEach(
+(id) => {
+
+  const coin =
+    state.coins.find(
+      (item) => item.id === id
+    );
+
+  if (!coin) return;
+
+  document
+    .querySelectorAll(
+      `[data-price="${id}"]`
+    )
+    .forEach(
+      (element) => {
+        element.textContent =
+          money(
+            coin.current_price
+          );
+      }
+    );
+}
+
 );
-
-const ethereum =
-state.coins.find(
-coin => coin.id === "ethereum"
-);
-
-if (bitcoin) {
-
-document
-  .querySelectorAll(
-    '[data-price="bitcoin"]'
-  )
-  .forEach(
-    element => {
-      element.textContent =
-        money(
-          bitcoin.current_price
-        );
-    }
-  );
-
 }
-
-if (ethereum) {
-
-document
-  .querySelectorAll(
-    '[data-price="ethereum"]'
-  )
-  .forEach(
-    element => {
-      element.textContent =
-        money(
-          ethereum.current_price
-        );
-    }
-  );
-
-}
-}
-
-/* =========================================================
-MARKET PULSE
-========================================================= */
 
 function updateMarketPulse() {
 
 const changes =
 state.coins
 .map(
-coin =>
+(coin) =>
 Number(
 coin.price_change_percentage_24h
 )
 )
-.filter(
-value => Number.isFinite(value)
-);
+.filter(Number.isFinite);
 
 if (!changes.length) return;
 
@@ -434,8 +394,7 @@ changes.reduce(
 0
 ) / changes.length;
 
-const score =
-Math.max(
+const score = Math.max(
 0,
 Math.min(
 100,
@@ -448,62 +407,59 @@ Math.round(
 const scoreElement =
 $("#marketScore");
 
-const smallScore =
-$(".score-small");
-
 if (scoreElement) {
 scoreElement.textContent =
 score;
 }
 
-if (smallScore) {
-smallScore.textContent =
+document
+.querySelectorAll(".score-small")
+.forEach(
+(element) => {
+element.textContent =
 score;
 }
+);
 
 const status =
-$(".pulse-info strong");
+document.querySelector(
+".pulse-info strong"
+);
 
-if (status) {
+if (!status) return;
 
 if (score >= 65) {
 
-  status.textContent =
-    "Bullish";
+status.textContent =
+  "Bullish";
 
-  status.className =
-    "positive-text";
+status.className =
+  "positive-text";
 
 } else if (score <= 35) {
 
-  status.textContent =
-    "Bearish";
+status.textContent =
+  "Bearish";
 
-  status.className =
-    "negative-text";
+status.className =
+  "negative-text";
 
 } else {
 
-  status.textContent =
-    "Neutral";
+status.textContent =
+  "Neutral";
 
-  status.className =
-    "warning-text";
-
-}
+status.className =
+  "warning-text";
 
 }
 }
-
-/* =========================================================
-SELECT COIN
-========================================================= */
 
 function selectCoin(id) {
 
 const coin =
 state.coins.find(
-item => item.id === id
+(item) => item.id === id
 );
 
 if (!coin) return;
@@ -519,7 +475,7 @@ $(".selected-asset span");
 const price =
 $(".chart-price strong");
 
-const changeElement =
+const change =
 $(".chart-price span");
 
 if (name) {
@@ -534,23 +490,23 @@ coin.symbol.toUpperCase();
 
 if (price) {
 price.textContent =
-money(coin.current_price);
+money(
+coin.current_price
+);
 }
 
-if (changeElement) {
+if (change) {
 
-const change =
+const value =
   Number(
-    coin.price_change_percentage_24h || 0
-  );
+    coin.price_change_percentage_24h
+  ) || 0;
 
+change.textContent =
+  percent(value);
 
-changeElement.textContent =
-  percent(change);
-
-
-changeElement.className =
-  change >= 0
+change.className =
+  value >= 0
     ? "positive-text"
     : "negative-text";
 
@@ -563,26 +519,19 @@ coin.symbol.toUpperCase()
 );
 }
 
-/* =========================================================
-COIN DETAILS
-========================================================= */
-
 async function loadCoinDetails(id) {
 
 try {
 
-const url =
-  `${API}/coins/${encodeURIComponent(id)}` +
-  `?localization=false` +
-  `&tickers=false` +
-  `&market_data=true` +
-  `&community_data=false` +
-  `&developer_data=false`;
-
-
 const data =
-  await fetchJSON(url);
-
+  await fetchJSON(
+    `${API}/coins/${encodeURIComponent(id)}` +
+    `?localization=false` +
+    `&tickers=false` +
+    `&market_data=true` +
+    `&community_data=false` +
+    `&developer_data=false`
+  );
 
 updateAnalysis(data);
 
@@ -596,10 +545,6 @@ console.error(
 }
 }
 
-/* =========================================================
-TECHNICAL ANALYSIS
-========================================================= */
-
 function updateAnalysis(data) {
 
 const market =
@@ -608,63 +553,44 @@ data.market_data;
 if (!market) return;
 
 const price =
-market.current_price?.usd || 0;
+market.current_price?.usd;
 
 const change =
-market.price_change_percentage_24h || 0;
+market.price_change_percentage_24h;
 
 const volume =
-market.total_volume?.usd || 0;
+market.total_volume?.usd;
 
 const rows =
 document.querySelectorAll(
 ".indicator-row"
 );
 
-if (rows[0]) {
-
-const strong =
-  rows[0].querySelector(
-    "strong"
-  );
-
-if (strong) {
-  strong.textContent =
-    money(price);
+if (
+rows[0]?.querySelector("strong")
+) {
+rows[0]
+.querySelector("strong")
+.textContent =
+money(price);
 }
 
+if (
+rows[1]?.querySelector("strong")
+) {
+rows[1]
+.querySelector("strong")
+.textContent =
+percent(change);
 }
 
-if (rows[1]) {
-
-const strong =
-  rows[1].querySelector(
-    "strong"
-  );
-
-if (strong) {
-
-  strong.textContent =
-    percent(change);
-
-}
-
-}
-
-if (rows[2]) {
-
-const strong =
-  rows[2].querySelector(
-    "strong"
-  );
-
-if (strong) {
-
-  strong.textContent =
-    largeNumber(volume);
-
-}
-
+if (
+rows[2]?.querySelector("strong")
+) {
+rows[2]
+.querySelector("strong")
+.textContent =
+largeNumber(volume);
 }
 
 const score =
@@ -673,33 +599,28 @@ Math.max(
 Math.min(
 100,
 Math.round(
-50 + Number(change) * 4
+50 +
+Number(change || 0) * 4
 )
 )
 );
 
-const scoreSmall =
-$(".score-small");
-
-if (scoreSmall) {
-scoreSmall.textContent =
+document
+.querySelectorAll(".score-small")
+.forEach(
+(element) => {
+element.textContent =
 score;
 }
+);
 
-const marketScore =
-$("#marketScore");
-
-if (marketScore) {
-marketScore.textContent =
+if ($("#marketScore")) {
+$("#marketScore").textContent =
 score;
 }
 
 updatePrediction(data);
 }
-
-/* =========================================================
-PREDICTION
-========================================================= */
 
 function updatePrediction(data) {
 
@@ -709,18 +630,19 @@ data.market_data;
 if (!market) return;
 
 const price =
-market.current_price?.usd || 0;
+Number(
+market.current_price?.usd
+) || 0;
 
 const day =
 Number(
-market.price_change_percentage_24h || 0
-);
+market.price_change_percentage_24h
+) || 0;
 
 const week =
 Number(
-market.price_change_percentage_7d ||
-day
-);
+market.price_change_percentage_7d
+) || day;
 
 const momentum =
 day * 0.4 +
@@ -729,13 +651,19 @@ week * 0.6;
 const predictions = [
 
 price *
-  (1 + momentum / 100 * 0.35),
+  (1 +
+    (momentum / 100) *
+    0.35),
 
 price *
-  (1 + momentum / 100 * 0.9),
+  (1 +
+    (momentum / 100) *
+    0.9),
 
 price *
-  (1 + momentum / 100 * 1.8)
+  (1 +
+    (momentum / 100) *
+    1.8)
 
 ];
 
@@ -747,24 +675,19 @@ document
 (element, index) => {
 
     if (
-      predictions[index] !== undefined
+      predictions[index] !==
+      undefined
     ) {
-
       element.textContent =
         money(
           predictions[index]
         );
-
     }
 
   }
 );
 
 }
-
-/* =========================================================
-TRADINGVIEW
-========================================================= */
 
 function loadTradingView(symbol) {
 
@@ -773,17 +696,21 @@ $("#tradingview-widget");
 
 if (!container) return;
 
-container.innerHTML = `
+container.innerHTML = "";
 
-<div
-  class="tradingview-widget-container__widget"
-  style="
-    width:100%;
-    height:100%;
-  "
-></div>
+const widget =
+document.createElement(
+"div"
+);
 
-`;
+widget.className =
+"tradingview-widget-container__widget";
+
+widget.style.width =
+"100%";
+
+widget.style.height =
+"100%";
 
 const script =
 document.createElement(
@@ -803,16 +730,20 @@ JSON.stringify({
   symbol:
     `BINANCE:${symbol}USDT`,
 
-  interval: "60",
+  interval:
+    "60",
 
   timezone:
     "Etc/UTC",
 
-  theme: "dark",
+  theme:
+    "dark",
 
-  style: "1",
+  style:
+    "1",
 
-  locale: "en",
+  locale:
+    "en",
 
   enable_publishing:
     false,
@@ -837,13 +768,13 @@ JSON.stringify({
 });
 
 container.appendChild(
+widget
+);
+
+container.appendChild(
 script
 );
 }
-
-/* =========================================================
-FAVORITES
-========================================================= */
 
 function toggleFavorite(id) {
 
@@ -853,12 +784,16 @@ state.favorites.includes(id)
 
 state.favorites =
   state.favorites.filter(
-    coinId => coinId !== id
+    (item) =>
+      item !== id
   );
 
 } else {
 
-state.favorites.push(id);
+state.favorites = [
+  ...state.favorites,
+  id
+];
 
 }
 
@@ -873,10 +808,6 @@ renderCoins(
 state.coins
 );
 }
-
-/* =========================================================
-SEARCH
-========================================================= */
 
 function setupSearch() {
 
@@ -894,43 +825,26 @@ input.addEventListener(
       .trim()
       .toLowerCase();
 
-
-  if (!query) {
-
-    renderCoins(
-      state.coins
-    );
-
-    return;
-
-  }
-
-
   const filtered =
-    state.coins.filter(
-      coin =>
-        coin.name
-          .toLowerCase()
-          .includes(query) ||
-
-        coin.symbol
-          .toLowerCase()
-          .includes(query)
-    );
-
+    !query
+      ? state.coins
+      : state.coins.filter(
+          (coin) =>
+            coin.name
+              .toLowerCase()
+              .includes(query) ||
+            coin.symbol
+              .toLowerCase()
+              .includes(query)
+        );
 
   renderCoins(
     filtered
   );
-
 }
 
 );
 }
-
-/* =========================================================
-SCANNER
-========================================================= */
 
 function setupScanner() {
 
@@ -946,112 +860,98 @@ button.addEventListener(
   const result =
     $(".scanner-results");
 
-
   if (!result) return;
-
-
-  if (!state.coins.length) {
-
-    result.innerHTML = `
-      <div class="scanner-empty">
-        Market data is still loading.
-      </div>
-    `;
-
-    return;
-
-  }
-
 
   const coins =
     [...state.coins]
       .sort(
         (a, b) =>
           Number(
-            b.price_change_percentage_24h ||
-            0
+            b.price_change_percentage_24h
           ) -
           Number(
-            a.price_change_percentage_24h ||
-            0
+            a.price_change_percentage_24h
           )
       )
       .slice(0, 5);
 
+  if (!coins.length) {
+
+    result.innerHTML =
+      `
+        <div class="scanner-empty">
+          Market data is still loading.
+        </div>
+      `;
+
+    return;
+  }
 
   result.innerHTML =
     coins
       .map(
-        coin => `
+        (coin) => {
 
-          <div class="mini-opportunity">
+          const change =
+            Number(
+              coin.price_change_percentage_24h
+            ) || 0;
 
+          return `
             <div
-              class="mini-opportunity-coin"
+              class="mini-opportunity"
             >
 
-              <img
-                src="${escapeHTML(
-                  coin.image
-                )}"
-                width="34"
-                height="34"
-                style="
-                  border-radius:50%;
-                "
-                loading="lazy"
+              <div
+                class="mini-opportunity-coin"
               >
 
-              <div>
+                <img
+                  src="${escapeHTML(
+                    coin.image
+                  )}"
+                  width="34"
+                  height="34"
+                  alt=""
+                >
 
-                <strong>
-                  ${escapeHTML(
-                    coin.name
-                  )}
-                </strong>
+                <div>
 
-                <small>
-                  ${escapeHTML(
-                    coin.symbol.toUpperCase()
-                  )}
-                </small>
+                  <strong>
+                    ${escapeHTML(
+                      coin.name
+                    )}
+                  </strong>
+
+                  <small>
+                    ${escapeHTML(
+                      coin.symbol.toUpperCase()
+                    )}
+                  </small>
+
+                </div>
 
               </div>
 
+              <strong
+                class="${
+                  change >= 0
+                    ? "positive-text"
+                    : "negative-text"
+                }"
+              >
+                ${percent(change)}
+              </strong>
+
             </div>
-
-
-            <strong
-              class="${
-                Number(
-                  coin.price_change_percentage_24h ||
-                  0
-                ) >= 0
-                  ? "positive-text"
-                  : "negative-text"
-              }"
-            >
-
-              ${percent(
-                coin.price_change_percentage_24h
-              )}
-
-            </strong>
-
-          </div>
-
-        `
+          `;
+        }
       )
       .join("");
-
 }
 
 );
 }
-
-/* =========================================================
-NAVIGATION
-========================================================= */
 
 function setupNavigation() {
 
@@ -1060,48 +960,48 @@ document
 '.nav-item[href^="#"]'
 )
 .forEach(
-item => {
+(item) => {
 
     item.addEventListener(
       "click",
-      event => {
+      (event) => {
+
+        const selector =
+          item.getAttribute(
+            "href"
+          );
 
         const target =
           document.querySelector(
-            item.getAttribute(
-              "href"
-            )
+            selector
           );
-
 
         if (!target) return;
 
-
         event.preventDefault();
 
-
         target.scrollIntoView({
-          behavior: "smooth",
-          block: "start"
-        });
+          behavior:
+            "smooth",
 
+          block:
+            "start"
+        });
 
         document
           .querySelectorAll(
             ".nav-item"
           )
           .forEach(
-            nav =>
+            (nav) =>
               nav.classList.remove(
                 "active"
               )
           );
 
-
         item.classList.add(
           "active"
         );
-
       }
     );
 
@@ -1109,10 +1009,6 @@ item => {
 );
 
 }
-
-/* =========================================================
-MOBILE MENU
-========================================================= */
 
 function setupMobileMenu() {
 
@@ -1122,25 +1018,17 @@ $(".mobile-menu");
 const sidebar =
 $(".sidebar");
 
-if (!button || !sidebar)
-return;
+if (!button || !sidebar) return;
 
 button.addEventListener(
 "click",
 () => {
-
-  sidebar.classList.toggle(
-    "open"
-  );
-
-}
-
+sidebar.classList.toggle(
+"open"
 );
 }
-
-/* =========================================================
-TIME BUTTONS
-========================================================= */
+);
+}
 
 function setupTimeButtons() {
 
@@ -1149,7 +1037,7 @@ document
 ".time-button"
 )
 .forEach(
-button => {
+(button) => {
 
     button.addEventListener(
       "click",
@@ -1160,91 +1048,39 @@ button => {
             ".time-button"
           )
           .forEach(
-            b =>
-              b.classList.remove(
+            (item) =>
+              item.classList.remove(
                 "active"
               )
           );
-
 
         button.classList.add(
           "active"
         );
 
+        const coin =
+          state.coins.find(
+            (item) =>
+              item.id ===
+              state.selected
+          );
+
+        if (coin) {
+
+          loadTradingView(
+            coin.symbol.toUpperCase()
+          );
+
+        }
+
       }
     );
-
   }
 );
 
 }
 
-/* =========================================================
-ERROR
-========================================================= */
-
-function showError() {
-
-const grid =
-$("#coinGrid");
-
-if (!grid) return;
-
-grid.innerHTML = `
-
-<div
-  class="loading-card"
-  style="color:#ff6477"
->
-
-  ⚠ Unable to load market data.
-
-  <br><br>
-
-  <button
-    type="button"
-    onclick="loadMarketData()"
-    class="secondary-button"
-  >
-    Retry
-  </button>
-
-</div>
-
-`;
-}
-
-/* =========================================================
-AUTO REFRESH
-========================================================= */
-
-function startAutoRefresh() {
-
-setInterval(
-() => {
-
-  if (
-    document.visibilityState ===
-    "visible"
-  ) {
-
-    loadMarketData();
-
-  }
-
-},
-60000
-
-);
-}
-
-/* =========================================================
-INITIALIZATION
-========================================================= */
-
-document.addEventListener(
-"DOMContentLoaded",
-() => {
+function init() {
 
 setupSearch();
 
@@ -1258,11 +1094,23 @@ setupTimeButtons();
 
 loadMarketData();
 
-startAutoRefresh();
+setInterval(
+() => {
 
-console.log(
-  "CryptoVision initialized successfully."
+  if (
+    document.visibilityState ===
+    "visible"
+  ) {
+    loadMarketData();
+  }
+
+},
+60000
+
 );
-
 }
+
+document.addEventListener(
+"DOMContentLoaded",
+init
 );
