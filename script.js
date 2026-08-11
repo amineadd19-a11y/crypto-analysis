@@ -1,6 +1,9 @@
 "use strict";
 
-const API_BASE = "https://api.coingecko.com/api/v3";
+const API = {
+  market: "/api/market",
+  chart: "/api/chart"
+};
 
 const state = {
   coins: [],
@@ -12,71 +15,71 @@ const state = {
 
 const $ = (id) => document.getElementById(id);
 
-const safeText = (value) =>
-  String(value ?? "")
-    .replace(/[&<>"']/g, (char) => ({
-      "&": "&amp;",
-      "<": "&lt;",
-      ">": "&gt;",
-      '"': "&quot;",
-      "'": "&#039;"
-    }[char]));
-
 function formatPrice(value) {
-  if (value == null || !Number.isFinite(Number(value))) return "—";
+  const n = Number(value);
 
-  const number = Number(value);
+  if (!Number.isFinite(n)) return "—";
 
-  if (number >= 1000) {
-    return number.toLocaleString("en-US", {
+  if (n >= 1000) {
+    return n.toLocaleString("en-US", {
       maximumFractionDigits: 2
     });
   }
 
-  if (number >= 1) {
-    return number.toLocaleString("en-US", {
+  if (n >= 1) {
+    return n.toLocaleString("en-US", {
       maximumFractionDigits: 4
     });
   }
 
-  return number.toLocaleString("en-US", {
+  return n.toLocaleString("en-US", {
     maximumFractionDigits: 8
   });
 }
 
 function formatCompact(value) {
-  if (value == null || !Number.isFinite(Number(value))) return "—";
+  const n = Number(value);
 
-  const number = Number(value);
+  if (!Number.isFinite(n)) return "—";
 
-  if (number >= 1e12) return "$" + (number / 1e12).toFixed(2) + "T";
-  if (number >= 1e9) return "$" + (number / 1e9).toFixed(2) + "B";
-  if (number >= 1e6) return "$" + (number / 1e6).toFixed(2) + "M";
-  if (number >= 1e3) return "$" + (number / 1e3).toFixed(2) + "K";
+  if (n >= 1e12) return "$" + (n / 1e12).toFixed(2) + "T";
+  if (n >= 1e9) return "$" + (n / 1e9).toFixed(2) + "B";
+  if (n >= 1e6) return "$" + (n / 1e6).toFixed(2) + "M";
+  if (n >= 1e3) return "$" + (n / 1e3).toFixed(2) + "K";
 
-  return "$" + number.toLocaleString("en-US");
+  return "$" + n.toLocaleString("en-US");
 }
 
 function formatChange(value) {
-  const number = Number(value) || 0;
-  return `${number >= 0 ? "+" : ""}${number.toFixed(2)}%`;
+  const n = Number(value) || 0;
+  return `${n >= 0 ? "+" : ""}${n.toFixed(2)}%`;
 }
 
-function setStatus(message, type = "") {
+function escapeHTML(value) {
+  return String(value ?? "").replace(
+    /[&<>"']/g,
+    (char) =>
+      ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#039;"
+      })[char]
+  );
+}
+
+function setStatus(message) {
   const element = $("marketStatus");
-  if (!element) return;
 
-  element.textContent = message;
-  element.className = "market-status";
-
-  if (type) {
-    element.classList.add(type);
+  if (element) {
+    element.textContent = message;
   }
 }
 
 
 /* =========================
-   MARKET API
+   MARKET
 ========================= */
 
 async function fetchMarket() {
@@ -84,20 +87,10 @@ async function fetchMarket() {
 
   state.loading = true;
 
-  setStatus("Loading live cryptocurrency market...");
+  setStatus("Loading live market data...");
 
   try {
-    const url =
-      API_BASE +
-      "/coins/markets" +
-      "?vs_currency=usd" +
-      "&order=market_cap_desc" +
-      "&per_page=100" +
-      "&page=1" +
-      "&sparkline=false" +
-      "&price_change_percentage=24h";
-
-    const response = await fetch(url, {
+    const response = await fetch(API.market, {
       method: "GET",
       headers: {
         Accept: "application/json"
@@ -106,16 +99,24 @@ async function fetchMarket() {
     });
 
     if (!response.ok) {
-      throw new Error(`API request failed: ${response.status}`);
+      throw new Error(
+        `Market API error: ${response.status}`
+      );
     }
 
     const data = await response.json();
 
     if (!Array.isArray(data)) {
-      throw new Error("Invalid market response");
+      throw new Error("Invalid market data");
     }
 
-    state.coins = data.filter(isValidCoin);
+    state.coins = data.filter(
+      (coin) =>
+        coin &&
+        coin.id &&
+        coin.name &&
+        coin.symbol
+    );
 
     renderMarket();
     updateBitcoin();
@@ -123,27 +124,28 @@ async function fetchMarket() {
     renderTrending();
 
     setStatus(
-      `${state.coins.length} cryptocurrencies loaded successfully.`
+      `${state.coins.length} cryptocurrencies loaded.`
     );
 
-    $("updated").textContent =
-      "Updated: " + new Date().toLocaleTimeString();
+    if ($("updated")) {
+      $("updated").textContent =
+        "Updated: " +
+        new Date().toLocaleTimeString();
+    }
 
   } catch (error) {
-    console.error("Market error:", error);
+
+    console.error(error);
 
     setStatus(
-      "Market data could not be loaded. Please try again.",
-      "negative"
+      "Unable to load market data. Please try again."
     );
 
-    const container = $("coins");
-
-    if (container) {
-      container.innerHTML = `
+    if ($("coins")) {
+      $("coins").innerHTML = `
         <div class="error-card">
-          Unable to load live cryptocurrency data.
-          Please wait a moment and press Refresh.
+          Market data is temporarily unavailable.
+          Please press Refresh and try again.
         </div>
       `;
     }
@@ -154,18 +156,8 @@ async function fetchMarket() {
 }
 
 
-function isValidCoin(coin) {
-  return Boolean(
-    coin &&
-    coin.id &&
-    coin.name &&
-    coin.symbol
-  );
-}
-
-
 /* =========================
-   MARKET RENDER
+   MARKET CARDS
 ========================= */
 
 function renderMarket() {
@@ -182,8 +174,12 @@ function renderMarket() {
 
   if (query) {
     coins = coins.filter((coin) => {
-      const name = String(coin.name).toLowerCase();
-      const symbol = String(coin.symbol).toLowerCase();
+
+      const name =
+        String(coin.name).toLowerCase();
+
+      const symbol =
+        String(coin.symbol).toLowerCase();
 
       return (
         name.includes(query) ||
@@ -192,12 +188,18 @@ function renderMarket() {
     });
   }
 
-  const sort = $("coinSort")?.value || "rank";
+  const sort =
+    $("coinSort")?.value || "rank";
 
   coins.sort((a, b) => {
+
     switch (sort) {
+
       case "price":
-        return (b.current_price || 0) - (a.current_price || 0);
+        return (
+          (b.current_price || 0) -
+          (a.current_price || 0)
+        );
 
       case "change":
         return (
@@ -206,10 +208,16 @@ function renderMarket() {
         );
 
       case "volume":
-        return (b.total_volume || 0) - (a.total_volume || 0);
+        return (
+          (b.total_volume || 0) -
+          (a.total_volume || 0)
+        );
 
       case "marketcap":
-        return (b.market_cap || 0) - (a.market_cap || 0);
+        return (
+          (b.market_cap || 0) -
+          (a.market_cap || 0)
+        );
 
       default:
         return (
@@ -220,54 +228,65 @@ function renderMarket() {
   });
 
   if (!coins.length) {
+
     container.innerHTML = `
       <div class="loading-card">
         No cryptocurrency found.
       </div>
     `;
+
     return;
   }
 
-  container.innerHTML = coins
-    .slice(0, 100)
-    .map(createCoinCard)
-    .join("");
+  container.innerHTML =
+    coins
+      .slice(0, 100)
+      .map(createCoinCard)
+      .join("");
 
   container
     .querySelectorAll("[data-coin-id]")
     .forEach((card) => {
-      card.addEventListener("click", () => {
-        const coin = state.coins.find(
-          (item) => item.id === card.dataset.coinId
-        );
 
-        if (coin) {
-          showCoinDetails(coin);
+      card.addEventListener(
+        "click",
+        () => {
+
+          const coin =
+            state.coins.find(
+              (item) =>
+                item.id ===
+                card.dataset.coinId
+            );
+
+          if (coin) {
+            showCoinDetails(coin);
+          }
         }
-      });
+      );
+
     });
 }
 
 
 function createCoinCard(coin) {
+
   const change =
-    Number(coin.price_change_percentage_24h) || 0;
+    Number(
+      coin.price_change_percentage_24h
+    ) || 0;
 
   const changeClass =
-    change >= 0 ? "positive" : "negative";
-
-  const image =
-    typeof coin.image === "string"
-      ? coin.image
-      : "";
+    change >= 0
+      ? "positive"
+      : "negative";
 
   return `
     <article
       class="coin-card"
-      data-coin-id="${safeText(coin.id)}"
+      data-coin-id="${escapeHTML(coin.id)}"
       tabindex="0"
       role="button"
-      aria-label="Open ${safeText(coin.name)} analysis"
     >
 
       <div class="coin-top">
@@ -275,9 +294,9 @@ function createCoinCard(coin) {
         <div class="coin-identity">
 
           <img
-            src="${safeText(image)}"
-            alt="${safeText(coin.name)} logo"
             class="coin-image"
+            src="${escapeHTML(coin.image)}"
+            alt="${escapeHTML(coin.name)} logo"
             loading="lazy"
             referrerpolicy="no-referrer"
           >
@@ -285,11 +304,13 @@ function createCoinCard(coin) {
           <div>
 
             <div class="coin-name">
-              ${safeText(coin.name)}
+              ${escapeHTML(coin.name)}
             </div>
 
             <div class="coin-symbol">
-              ${safeText(coin.symbol).toUpperCase()}
+              ${escapeHTML(
+                coin.symbol
+              ).toUpperCase()}
             </div>
 
           </div>
@@ -313,11 +334,13 @@ function createCoinCard(coin) {
       <div class="coin-meta">
 
         <span>
-          Market Cap ${formatCompact(coin.market_cap)}
+          Market Cap
+          ${formatCompact(coin.market_cap)}
         </span>
 
         <span>
-          Volume ${formatCompact(coin.total_volume)}
+          Volume
+          ${formatCompact(coin.total_volume)}
         </span>
 
       </div>
@@ -332,31 +355,51 @@ function createCoinCard(coin) {
 ========================= */
 
 function updateBitcoin() {
-  const btc = state.coins.find(
-    (coin) =>
-      coin.id === "bitcoin" ||
-      String(coin.symbol).toLowerCase() === "btc"
-  );
+
+  const btc =
+    state.coins.find(
+      (coin) =>
+        coin.id === "bitcoin" ||
+        String(coin.symbol)
+          .toLowerCase() === "btc"
+    );
 
   if (!btc) return;
 
-  $("btcPrice").textContent =
-    "$" + formatPrice(btc.current_price);
+  if ($("btcPrice")) {
+    $("btcPrice").textContent =
+      "$" +
+      formatPrice(
+        btc.current_price
+      );
+  }
 
-  $("btcChange").textContent =
-    formatChange(btc.price_change_percentage_24h);
+  if ($("btcChange")) {
 
-  $("btcChange").className =
-    "hero-change " +
-    (
-      (btc.price_change_percentage_24h || 0) >= 0
-        ? "positive"
-        : "negative"
-    );
+    const change =
+      Number(
+        btc.price_change_percentage_24h
+      ) || 0;
 
-  $("btcMarketCap").textContent =
-    "Market cap: " +
-    formatCompact(btc.market_cap);
+    $("btcChange").textContent =
+      formatChange(change);
+
+    $("btcChange").className =
+      "hero-change " +
+      (
+        change >= 0
+          ? "positive"
+          : "negative"
+      );
+  }
+
+  if ($("btcMarketCap")) {
+    $("btcMarketCap").textContent =
+      "Market cap: " +
+      formatCompact(
+        btc.market_cap
+      );
+  }
 }
 
 
@@ -365,49 +408,40 @@ function updateBitcoin() {
 ========================= */
 
 function renderTrending() {
-  const container = $("trendingCoins");
+
+  const container =
+    $("trendingCoins");
 
   if (!container) return;
 
-  const coins = [...state.coins]
-    .sort(
-      (a, b) =>
-        (b.price_change_percentage_24h || 0) -
-        (a.price_change_percentage_24h || 0)
-    )
-    .slice(0, 4);
+  const coins =
+    [...state.coins]
+      .sort(
+        (a, b) =>
+          (b.price_change_percentage_24h || 0) -
+          (a.price_change_percentage_24h || 0)
+      )
+      .slice(0, 4);
 
-  if (!coins.length) {
-    container.innerHTML = `
-      <div class="loading-card">
-        No trending data available.
-      </div>
-    `;
-    return;
-  }
-
-  container.innerHTML = coins
-    .map((coin) => {
+  container.innerHTML =
+    coins.map((coin) => {
 
       const change =
-        Number(coin.price_change_percentage_24h) || 0;
-
-      const image =
-        typeof coin.image === "string"
-          ? coin.image
-          : "";
+        Number(
+          coin.price_change_percentage_24h
+        ) || 0;
 
       return `
         <article
           class="trending-card"
-          data-trending-id="${safeText(coin.id)}"
+          data-trending-id="${escapeHTML(coin.id)}"
         >
 
           <div class="trending-card-top">
 
             <img
-              src="${safeText(image)}"
-              alt="${safeText(coin.name)} logo"
+              src="${escapeHTML(coin.image)}"
+              alt="${escapeHTML(coin.name)} logo"
               loading="lazy"
               referrerpolicy="no-referrer"
             >
@@ -415,48 +449,62 @@ function renderTrending() {
             <div>
 
               <h3>
-                ${safeText(coin.name)}
+                ${escapeHTML(coin.name)}
               </h3>
 
               <p>
-                ${safeText(coin.symbol).toUpperCase()}
+                ${escapeHTML(
+                  coin.symbol
+                ).toUpperCase()}
               </p>
 
             </div>
 
           </div>
 
-          <strong class="${
-            change >= 0 ? "positive" : "negative"
-          }">
+          <strong
+            class="${
+              change >= 0
+                ? "positive"
+                : "negative"
+            }"
+          >
             ${formatChange(change)}
           </strong>
 
           <p>
-            $${formatPrice(coin.current_price)}
+            $${formatPrice(
+              coin.current_price
+            )}
           </p>
 
         </article>
       `;
-    })
-    .join("");
+    }).join("");
 
   container
-    .querySelectorAll("[data-trending-id]")
+    .querySelectorAll(
+      "[data-trending-id]"
+    )
     .forEach((card) => {
 
-      card.addEventListener("click", () => {
+      card.addEventListener(
+        "click",
+        () => {
 
-        const coin = state.coins.find(
-          (item) =>
-            item.id === card.dataset.trendingId
-        );
+          const coin =
+            state.coins.find(
+              (item) =>
+                item.id ===
+                card.dataset.trendingId
+            );
 
-        if (coin) {
-          showCoinDetails(coin);
+          if (coin) {
+            showCoinDetails(coin);
+          }
+
         }
-
-      });
+      );
 
     });
 }
@@ -467,30 +515,43 @@ function renderTrending() {
 ========================= */
 
 function updateMarketAnalysis() {
+
   if (!state.coins.length) return;
 
-  const changes = state.coins.map(
-    (coin) =>
-      Number(coin.price_change_percentage_24h) || 0
-  );
+  const changes =
+    state.coins.map(
+      (coin) =>
+        Number(
+          coin.price_change_percentage_24h
+        ) || 0
+    );
 
   const average =
     changes.reduce(
-      (sum, value) => sum + value,
+      (sum, value) =>
+        sum + value,
       0
     ) / changes.length;
 
-  let momentum =
-    50 + average * 10;
+  const momentum =
+    Math.max(
+      0,
+      Math.min(
+        100,
+        50 + average * 10
+      )
+    );
 
-  momentum =
-    Math.max(0, Math.min(100, momentum));
+  if ($("momentumValue")) {
+    $("momentumValue").textContent =
+      Math.round(momentum) +
+      "/100";
+  }
 
-  $("momentumValue").textContent =
-    Math.round(momentum) + "/100";
-
-  $("momentumBar").style.width =
-    momentum + "%";
+  if ($("momentumBar")) {
+    $("momentumBar").style.width =
+      momentum + "%";
+  }
 
   let trend;
 
@@ -522,7 +583,7 @@ function updateMarketAnalysis() {
       "Strong negative market momentum.";
 
     $("marketTrendText").textContent =
-      "The market is currently under stronger selling pressure.";
+      "The market currently shows stronger selling pressure.";
 
   } else if (average < -.5) {
 
@@ -545,25 +606,14 @@ function updateMarketAnalysis() {
       "No strong market direction is currently detected.";
   }
 
-  $("marketTrend").textContent = trend;
-
-  const shortScenario =
-    Math.max(
-      -20,
-      Math.min(30, average * 4)
-    );
-
-  const mediumScenario =
-    Math.max(
-      -40,
-      Math.min(70, average * 10)
-    );
+  $("marketTrend").textContent =
+    trend;
 
   $("shortTerm").textContent =
-    formatScenario(shortScenario);
+    scenario(average * 4);
 
   $("mediumTerm").textContent =
-    formatScenario(mediumScenario);
+    scenario(average * 10);
 }
 
 
@@ -572,13 +622,17 @@ function updateMarketAnalysis() {
 ========================= */
 
 async function showCoinDetails(coin) {
+
   state.selectedCoin = coin;
 
-  const section = $("coinDetails");
+  const section =
+    $("coinDetails");
 
   if (!section) return;
 
-  section.classList.remove("hidden");
+  section.classList.remove(
+    "hidden"
+  );
 
   $("selectedCoinName").textContent =
     coin.name;
@@ -586,36 +640,52 @@ async function showCoinDetails(coin) {
   $("selectedCoinSymbol").textContent =
     coin.symbol.toUpperCase();
 
-  const image = $("selectedCoinImage");
+  const image =
+    $("selectedCoinImage");
 
   if (image && coin.image) {
     image.src = coin.image;
-    image.alt = coin.name + " logo";
+    image.alt =
+      coin.name + " logo";
     image.hidden = false;
   }
 
   $("detailPrice").textContent =
-    "$" + formatPrice(coin.current_price);
+    "$" +
+    formatPrice(
+      coin.current_price
+    );
 
   const change =
-    Number(coin.price_change_percentage_24h) || 0;
+    Number(
+      coin.price_change_percentage_24h
+    ) || 0;
 
   $("detailChange").textContent =
     formatChange(change);
 
   $("detailChange").className =
-    change >= 0 ? "positive" : "negative";
+    change >= 0
+      ? "positive"
+      : "negative";
 
   $("detailMarketCap").textContent =
-    formatCompact(coin.market_cap);
+    formatCompact(
+      coin.market_cap
+    );
 
   $("detailVolume").textContent =
-    formatCompact(coin.total_volume);
+    formatCompact(
+      coin.total_volume
+    );
 
   calculateCoinScore(coin);
   generateScenarios(coin);
 
-  await loadChart(coin.id, state.chartDays);
+  await loadChart(
+    coin.id,
+    state.chartDays
+  );
 
   section.scrollIntoView({
     behavior: "smooth",
@@ -629,14 +699,21 @@ async function showCoinDetails(coin) {
 ========================= */
 
 function calculateCoinScore(coin) {
+
   const change =
-    Number(coin.price_change_percentage_24h) || 0;
+    Number(
+      coin.price_change_percentage_24h
+    ) || 0;
 
   const marketCap =
-    Number(coin.market_cap) || 0;
+    Number(
+      coin.market_cap
+    ) || 0;
 
   const volume =
-    Number(coin.total_volume) || 0;
+    Number(
+      coin.total_volume
+    ) || 0;
 
   let score = 50;
 
@@ -661,7 +738,10 @@ function calculateCoinScore(coin) {
     Math.round(
       Math.max(
         0,
-        Math.min(100, score)
+        Math.min(
+          100,
+          score
+        )
       )
     );
 
@@ -676,14 +756,14 @@ function calculateCoinScore(coin) {
     signal = "Bullish";
 
     explanation =
-      "Current market indicators show stronger positive momentum. This does not guarantee future performance.";
+      "Current indicators show stronger positive momentum. This is an educational signal, not a guaranteed prediction.";
 
   } else if (score >= 45) {
 
     signal = "Neutral";
 
     explanation =
-      "Current indicators are mixed and do not provide a strong directional signal.";
+      "Current indicators are mixed and do not show a strong directional signal.";
 
   } else {
 
@@ -713,33 +793,49 @@ function calculateCoinScore(coin) {
 ========================= */
 
 function generateScenarios(coin) {
+
   const change =
-    Number(coin.price_change_percentage_24h) || 0;
-
-  const short =
-    clamp(change * 1.8, -20, 30);
-
-  const medium =
-    clamp(change * 4, -35, 60);
-
-  const long =
-    clamp(change * 7, -50, 100);
+    Number(
+      coin.price_change_percentage_24h
+    ) || 0;
 
   $("shortPrediction").textContent =
-    formatScenario(short);
+    scenario(
+      clamp(
+        change * 1.8,
+        -20,
+        30
+      )
+    );
 
   $("mediumPrediction").textContent =
-    formatScenario(medium);
+    scenario(
+      clamp(
+        change * 4,
+        -35,
+        60
+      )
+    );
 
   $("longPrediction").textContent =
-    formatScenario(long);
+    scenario(
+      clamp(
+        change * 7,
+        -50,
+        100
+      )
+    );
 }
 
-function formatScenario(value) {
+function scenario(value) {
+
+  const n =
+    Number(value) || 0;
+
   return (
-    value >= 0 ? "+" : ""
+    n >= 0 ? "+" : ""
   ) +
-  Number(value).toFixed(1) +
+  n.toFixed(1) +
   "%";
 }
 
@@ -752,13 +848,21 @@ function clamp(value, min, max) {
 
 
 /* =========================
-   HISTORICAL CHART
+   CHART API
 ========================= */
 
-async function loadChart(coinId, days) {
-  const chart = $("chart");
+async function loadChart(
+  coinId,
+  days
+) {
+
+  const chart =
+    $("chart");
 
   if (!chart) return;
+
+  const key =
+    `${coinId}-${days}`;
 
   chart.innerHTML = `
     <div class="chart-loading">
@@ -766,15 +870,13 @@ async function loadChart(coinId, days) {
     </div>
   `;
 
-  const cacheKey =
-    `${coinId}-${days}`;
+  if (
+    state.chartCache.has(key)
+  ) {
 
-  if (state.chartCache.has(cacheKey)) {
-
-    const prices =
-      state.chartCache.get(cacheKey);
-
-    renderChart(prices);
+    renderChart(
+      state.chartCache.get(key)
+    );
 
     return;
   }
@@ -782,48 +884,51 @@ async function loadChart(coinId, days) {
   try {
 
     const url =
-      API_BASE +
-      `/coins/${encodeURIComponent(coinId)}/market_chart` +
-      `?vs_currency=usd&days=${days}`;
+      `${API.chart}?id=${encodeURIComponent(
+        coinId
+      )}&days=${encodeURIComponent(
+        days
+      )}`;
 
-    const response = await fetch(url, {
-      headers: {
-        Accept: "application/json"
-      },
-      cache: "no-store"
-    });
+    const response =
+      await fetch(url, {
+        headers: {
+          Accept: "application/json"
+        },
+        cache: "no-store"
+      });
 
     if (!response.ok) {
       throw new Error(
-        `Chart request failed: ${response.status}`
+        `Chart API error: ${response.status}`
       );
     }
 
-    const data = await response.json();
+    const data =
+      await response.json();
 
     if (
       !data ||
       !Array.isArray(data.prices) ||
       data.prices.length < 2
     ) {
-      throw new Error("No chart data");
+      throw new Error(
+        "Invalid chart data"
+      );
     }
 
     const prices =
-      data.prices
-        .filter(
-          (item) =>
-            Array.isArray(item) &&
-            item.length >= 2 &&
-            Number.isFinite(Number(item[1]))
-        )
-        .map((item) => [
-          Number(item[0]),
-          Number(item[1])
-        ]);
+      data.prices.filter(
+        (item) =>
+          Array.isArray(item) &&
+          item.length >= 2 &&
+          Number.isFinite(
+            Number(item[1])
+          )
+      );
 
     state.chartCache.set(
-      cacheKey,
+      key,
       prices
     );
 
@@ -831,7 +936,7 @@ async function loadChart(coinId, days) {
 
   } catch (error) {
 
-    console.error("Chart error:", error);
+    console.error(error);
 
     chart.innerHTML = `
       <div class="chart-loading">
@@ -842,19 +947,33 @@ async function loadChart(coinId, days) {
 }
 
 
-function renderChart(prices) {
-  const chart = $("chart");
+/* =========================
+   CHART RENDER
+========================= */
 
-  if (!chart || prices.length < 2) return;
+function renderChart(prices) {
+
+  const chart =
+    $("chart");
+
+  if (
+    !chart ||
+    prices.length < 2
+  ) {
+    return;
+  }
 
   const width = 1000;
   const height = 300;
 
-  const paddingX = 35;
-  const paddingY = 25;
+  const padX = 35;
+  const padY = 25;
 
   const values =
-    prices.map((item) => item[1]);
+    prices.map(
+      (item) =>
+        Number(item[1])
+    );
 
   const min =
     Math.min(...values);
@@ -866,30 +985,38 @@ function renderChart(prices) {
     max - min || 1;
 
   const points =
-    prices.map((item, index) => {
+    prices.map(
+      (item, index) => {
 
-      const x =
-        paddingX +
-        (
-          index /
-          (prices.length - 1)
-        ) *
-        (width - paddingX * 2);
+        const x =
+          padX +
+          (
+            index /
+            (prices.length - 1)
+          ) *
+          (width - padX * 2);
 
-      const y =
-        height -
-        paddingY -
-        (
-          (item[1] - min) /
-          range
-        ) *
-        (height - paddingY * 2);
+        const y =
+          height -
+          padY -
+          (
+            (
+              item[1] -
+              min
+            ) /
+            range
+          ) *
+          (
+            height -
+            padY * 2
+          );
 
-      return [
-        x,
-        y
-      ];
-    });
+        return [
+          x,
+          y
+        ];
+      }
+    );
 
   const line =
     points
@@ -900,22 +1027,23 @@ function renderChart(prices) {
       .join(" ");
 
   const area =
-    `${paddingX},${height - paddingY} ` +
+    `${padX},${height - padY} ` +
     line +
-    ` ${width - paddingX},${height - paddingY}`;
+    ` ${width - padX},${height - padY}`;
 
-  const first = values[0];
-  const last = values[values.length - 1];
+  const first =
+    values[0];
+
+  const last =
+    values[values.length - 1];
 
   const performance =
-    first !== 0
-      ? ((last - first) / first) * 100
+    first
+      ? (
+          (last - first) /
+          first
+        ) * 100
       : 0;
-
-  const performanceClass =
-    performance >= 0
-      ? "positive"
-      : "negative";
 
   chart.innerHTML = `
     <div
@@ -927,10 +1055,17 @@ function renderChart(prices) {
         font-size:12px;
         font-weight:800;
       "
-      class="${performanceClass}"
+      class="${
+        performance >= 0
+          ? "positive"
+          : "negative"
+      }"
     >
-      ${performance >= 0 ? "+" : ""}
-      ${performance.toFixed(2)}%
+      ${
+        performance >= 0
+          ? "+"
+          : ""
+      }${performance.toFixed(2)}%
     </div>
 
     <svg
@@ -980,7 +1115,6 @@ $("refreshBtn")?.addEventListener(
     state.chartCache.clear();
 
     fetchMarket();
-
   }
 );
 
@@ -988,13 +1122,11 @@ $("closeDetails")?.addEventListener(
   "click",
   () => {
 
-    $("coinDetails")?.classList.add(
-      "hidden"
-    );
+    $("coinDetails")
+      ?.classList.add("hidden");
 
   }
 );
-
 
 document
   .querySelectorAll(".period-button")
@@ -1005,55 +1137,37 @@ document
       async () => {
 
         document
-          .querySelectorAll(".period-button")
-          .forEach((item) =>
-            item.classList.remove("active")
+          .querySelectorAll(
+            ".period-button"
+          )
+          .forEach(
+            (item) =>
+              item.classList.remove(
+                "active"
+              )
           );
 
-        button.classList.add("active");
+        button.classList.add(
+          "active"
+        );
 
         state.chartDays =
-          Number(button.dataset.days) || 1;
+          Number(
+            button.dataset.days
+          ) || 1;
 
-        if (state.selectedCoin) {
+        if (
+          state.selectedCoin
+        ) {
 
           await loadChart(
             state.selectedCoin.id,
             state.chartDays
           );
-
         }
-
       }
     );
-
   });
-
-
-/* Keyboard accessibility */
-
-$("coins")?.addEventListener(
-  "keydown",
-  (event) => {
-
-    const card =
-      event.target.closest("[data-coin-id]");
-
-    if (!card) return;
-
-    if (
-      event.key === "Enter" ||
-      event.key === " "
-    ) {
-
-      event.preventDefault();
-
-      card.click();
-
-    }
-
-  }
-);
 
 
 /* =========================
