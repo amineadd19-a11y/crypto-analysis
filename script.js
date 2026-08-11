@@ -16,7 +16,8 @@ async function loadMarket() {
     }
 
     const coins = await response.json();
-
+allCoins = coins;
+setupMarketTools();
     displayCoins(coins);
     updateAnalysis(coins);
 
@@ -38,7 +39,63 @@ async function loadMarket() {
   }
 }
 
+let allCoins = [];
 
+function setupMarketTools() {
+
+  const search = document.getElementById("coinSearch");
+  const sort = document.getElementById("coinSort");
+
+  if (!search || !sort) return;
+
+  search.addEventListener("input", renderMarket);
+  sort.addEventListener("change", renderMarket);
+}
+
+function renderMarket() {
+
+  const search =
+    document.getElementById("coinSearch");
+
+  const sort =
+    document.getElementById("coinSort");
+
+  let filtered = [...allCoins];
+
+  const query =
+    search.value.trim().toLowerCase();
+
+  if (query) {
+    filtered = filtered.filter(coin =>
+      coin.name.toLowerCase().includes(query) ||
+      coin.symbol.toLowerCase().includes(query)
+    );
+  }
+
+  if (sort.value === "price") {
+    filtered.sort(
+      (a, b) => b.current_price - a.current_price
+    );
+  }
+
+  if (sort.value === "change") {
+    filtered.sort(
+      (a, b) =>
+        (b.price_change_percentage_24h || 0) -
+        (a.price_change_percentage_24h || 0)
+    );
+  }
+
+  if (sort.value === "volume") {
+    filtered.sort(
+      (a, b) =>
+        (b.total_volume || 0) -
+        (a.total_volume || 0)
+    );
+  }
+
+  displayCoins(filtered);
+}
 function displayCoins(coins) {
 
   const container = document.getElementById("coins");
