@@ -8,17 +8,19 @@ content="width=device-width, initial-scale=1.0"
 
 <meta
 name="description"
-content="CryptoVision - Professional cryptocurrency market intelligence, analysis, predictions and meme coin radar."
+content="CryptoVision — professional cryptocurrency market analysis, AI insights, predictions and market scanner."
 
 «»
 
 <meta
 name="theme-color"
-content="#070b14"
+content="#070a0f"
 
 «»
 
-  <title>CryptoVision — Market Intelligence</title>  <link
+  <title>
+    CryptoVision — Crypto Market Intelligence
+  </title>  <link
     rel="preconnect"
     href="https://fonts.googleapis.com"
   >  <link
@@ -32,104 +34,102 @@ content="#070b14"
     rel="stylesheet"
     href="style.css"
   >
-</head><body>  <!-- =====================================================
-       APP
-  ====================================================== -->  <div class="app"><!-- ===================================================
+</head><body>  <div class="app"><!-- =====================================================
      SIDEBAR
-==================================================== -->
+====================================================== -->
 
 <aside class="sidebar">
 
-  <div class="brand">
+  <div class="sidebar-logo">
 
-    <div class="brand-logo">
+    <div class="logo-mark">
       CV
     </div>
 
-    <div>
-      <strong>CryptoVision</strong>
-      <span>Market Intelligence</span>
+    <div class="logo-text">
+      CryptoVision
     </div>
 
   </div>
 
 
-  <nav class="navigation">
+  <nav class="sidebar-nav">
 
     <a
-      href="#dashboard"
       class="nav-item active"
+      href="#dashboard"
     >
-      <span>⌂</span>
-      Dashboard
+      <span class="nav-item-icon">⌂</span>
+      <span>Dashboard</span>
     </a>
 
+
     <a
+      class="nav-item"
       href="#markets"
-      class="nav-item"
     >
-      <span>◈</span>
-      Markets
+      <span class="nav-item-icon">◈</span>
+      <span>Markets</span>
     </a>
 
+
     <a
+      class="nav-item"
       href="#analysis"
-      class="nav-item"
     >
-      <span>◉</span>
-      AI Analysis
+      <span class="nav-item-icon">◒</span>
+      <span>Analysis</span>
     </a>
 
+
     <a
+      class="nav-item"
       href="#predictions"
-      class="nav-item"
     >
-      <span>◒</span>
-      Predictions
+      <span class="nav-item-icon">↗</span>
+      <span>Predictions</span>
     </a>
 
+
     <a
+      class="nav-item"
       href="#scanner"
-      class="nav-item"
     >
-      <span>⌁</span>
-      Market Scanner
+      <span class="nav-item-icon">⌁</span>
+      <span>Market Scanner</span>
     </a>
 
+
     <a
+      class="nav-item"
       href="#meme-radar"
-      class="nav-item"
     >
-      <span>🚀</span>
-      Meme Radar
-    </a>
-
-    <a
-      href="#watchlist"
-      class="nav-item"
-    >
-      <span>☆</span>
-      Watchlist
+      <span class="nav-item-icon">◆</span>
+      <span>Meme Radar</span>
     </a>
 
   </nav>
 
 
-  <div class="sidebar-bottom">
+  <div class="sidebar-footer">
 
-    <div class="ai-status">
+    <div class="card">
 
-      <span class="status-dot"></span>
+      <div class="card-body">
 
-      <div>
-        <strong>AI Engine</strong>
-        <small>Online</small>
+        <strong>
+          CryptoVision AI
+        </strong>
+
+        <p
+          class="section-subtitle"
+          style="margin-top:6px"
+        >
+          Market intelligence dashboard.
+        </p>
+
       </div>
 
-    </div>
-
-    <div class="sidebar-version">
-      CryptoVision V5
     </div>
 
   </div>
@@ -137,403 +137,255 @@ content="#070b14"
 </aside>
 
 
-<!-- ===================================================
-     MAIN
-==================================================== -->
+<!-- =====================================================
+     TOPBAR
+====================================================== -->
 
-<main class="main">
+<header class="topbar">
 
-  <!-- =================================================
-       TOPBAR
-  ================================================== -->
-
-  <header class="topbar">
+  <div class="topbar-left">
 
     <button
-      class="mobile-menu"
+      class="icon-button mobile-menu"
+      type="button"
       aria-label="Open menu"
     >
       ☰
     </button>
 
 
-    <div class="topbar-title">
-
-      <span>MARKET INTELLIGENCE</span>
-
-      <strong>
-        Crypto Market
-      </strong>
-
-    </div>
-
-
     <div class="topbar-search">
-
-      <span>⌕</span>
 
       <input
         type="search"
-        placeholder="Search Bitcoin, Ethereum..."
-        autocomplete="off"
+        placeholder="Search cryptocurrency..."
+        aria-label="Search cryptocurrency"
       >
 
-      <kbd>/</kbd>
-
-    </div>
-
-
-    <div class="topbar-actions">
-
-      <button
-        class="icon-button"
-        title="Notifications"
-      >
-        ◔
-      </button>
-
-      <button
-        class="icon-button"
-        title="Settings"
-      >
-        ⚙
-      </button>
-
-    </div>
-
-  </header>
-
-
-  <!-- =================================================
-       TICKER
-  ================================================== -->
-
-  <div class="market-ticker">
-
-    <div class="ticker-label">
-      LIVE MARKET
-    </div>
-
-    <div
-      class="ticker-items"
-      id="tickerItems"
-    >
-      Loading market data...
     </div>
 
   </div>
 
 
-  <!-- =================================================
-       DASHBOARD
-  ================================================== -->
+  <div class="topbar-right">
 
-  <section
-    id="dashboard"
-    class="dashboard section"
-  >
-
-    <div class="hero">
-
-      <div class="hero-content">
-
-        <div class="eyebrow">
-          AI-POWERED MARKET INTELLIGENCE
-        </div>
-
-        <h1>
-          See the market
-          <span>before it moves.</span>
-        </h1>
-
-        <p>
-          Real-time crypto data, technical signals,
-          market intelligence and probability-based
-          forecasts in one place.
-        </p>
-
-        <div class="hero-buttons">
-
-          <a
-            href="#analysis"
-            class="primary-button"
-          >
-            ✦ Analyze Market
-          </a>
-
-          <a
-            href="#markets"
-            class="secondary-button"
-          >
-            Explore Markets
-          </a>
-
-        </div>
-
-      </div>
+    <button
+      class="icon-button"
+      type="button"
+      title="Notifications"
+    >
+      ♢
+    </button>
 
 
-      <!-- MARKET PULSE -->
+    <button
+      class="icon-button"
+      type="button"
+      title="Settings"
+    >
+      ⚙
+    </button>
 
-      <div class="market-pulse">
+  </div>
 
-        <div class="pulse-header">
-
-          <span>
-            MARKET PULSE
-          </span>
-
-          <span class="live-badge">
-            LIVE
-          </span>
-
-        </div>
+</header>
 
 
-        <div class="pulse-score">
+<!-- =====================================================
+     MAIN
+====================================================== -->
 
-          <div class="score-ring">
+<main class="main-wrapper">
 
-            <strong id="marketScore">
-              --
-            </strong>
-
-            <small>
-              / 100
-            </small>
-
-          </div>
-
-
-          <div class="pulse-info">
-
-            <strong>
-              Calculating
-            </strong>
-
-            <span>
-              Market sentiment
-            </span>
-
-          </div>
-
-        </div>
-
-
-        <div class="pulse-bars">
-
-          <div>
-            <span>Momentum</span>
-            <i></i>
-          </div>
-
-          <div>
-            <span>Volume</span>
-            <i></i>
-          </div>
-
-          <div>
-            <span>Sentiment</span>
-            <i></i>
-          </div>
-
-        </div>
-
-      </div>
-
-    </div>
+  <div class="content">
 
 
     <!-- =================================================
-         MARKET STATS
+         DASHBOARD
     ================================================== -->
 
-    <div class="stats-grid">
-
-      <div class="stat-card">
-
-        <span>BTC</span>
-
-        <strong data-price="bitcoin">
-          --
-        </strong>
-
-        <small>
-          Bitcoin
-        </small>
-
-      </div>
-
-
-      <div class="stat-card">
-
-        <span>ETH</span>
-
-        <strong data-price="ethereum">
-          --
-        </strong>
-
-        <small>
-          Ethereum
-        </small>
-
-      </div>
-
-
-      <div class="stat-card">
-
-        <span>GLOBAL MARKET</span>
-
-        <strong>
-          Live
-        </strong>
-
-        <small>
-          Market data
-        </small>
-
-      </div>
-
-
-      <div class="stat-card">
-
-        <span>AI SIGNAL</span>
-
-        <strong class="positive-text">
-          ACTIVE
-        </strong>
-
-        <small>
-          Intelligence engine
-        </small>
-
-      </div>
-
-    </div>
-
-  </section>
-
-
-  <!-- =================================================
-       MARKETS
-  ================================================== -->
-
-  <section
-    id="markets"
-    class="section"
-  >
-
-    <div class="section-heading">
-
-      <div>
-
-        <span class="section-kicker">
-          REAL-TIME DATA
-        </span>
-
-        <h2>
-          Top Crypto Markets
-        </h2>
-
-      </div>
-
-      <button
-        class="secondary-button"
-        onclick="loadMarketData()"
-      >
-        ↻ Refresh
-      </button>
-
-    </div>
-
-
-    <div
-      id="coinGrid"
-      class="coin-grid"
+    <section
+      id="dashboard"
+      class="section"
     >
 
-      <div class="loading-card">
-        Loading cryptocurrency markets...
-      </div>
+      <div class="section-header">
 
-    </div>
+        <div>
 
-  </section>
+          <h1 class="section-title">
+            Crypto Market Intelligence
+          </h1>
 
+          <p class="section-subtitle">
+            Real-time market data, analysis and signals.
+          </p>
 
-  <!-- =================================================
-       CHART + ANALYSIS
-  ================================================== -->
-
-  <section
-    id="analysis"
-    class="section analysis-section"
-  >
-
-    <div class="section-heading">
-
-      <div>
-
-        <span class="section-kicker">
-          TECHNICAL INTELLIGENCE
-        </span>
-
-        <h2>
-          Advanced Market Analysis
-        </h2>
+        </div>
 
       </div>
 
-      <div class="time-buttons">
 
-        <button
-          class="time-button active"
-          data-interval="1h"
-        >
-          1H
-        </button>
+      <!-- MARKET STATS -->
 
-        <button
-          class="time-button"
-          data-interval="4h"
-        >
-          4H
-        </button>
+      <div class="market-overview">
 
-        <button
-          class="time-button"
-          data-interval="1d"
-        >
-          1D
-        </button>
+        <div class="market-stat">
 
-        <button
-          class="time-button"
-          data-interval="1w"
-        >
-          1W
-        </button>
+          <div class="market-stat-label">
+            Bitcoin
+          </div>
+
+          <div
+            class="market-stat-value"
+            data-price="bitcoin"
+          >
+            --
+          </div>
+
+          <div class="market-stat-change">
+            BTC
+          </div>
+
+        </div>
+
+
+        <div class="market-stat">
+
+          <div class="market-stat-label">
+            Ethereum
+          </div>
+
+          <div
+            class="market-stat-value"
+            data-price="ethereum"
+          >
+            --
+          </div>
+
+          <div class="market-stat-change">
+            ETH
+          </div>
+
+        </div>
+
+
+        <div class="market-stat">
+
+          <div class="market-stat-label">
+            Market Pulse
+          </div>
+
+          <div
+            class="market-stat-value"
+            id="marketScore"
+          >
+            --
+          </div>
+
+          <div class="market-stat-change">
+            AI market score
+          </div>
+
+        </div>
+
+
+        <div class="market-stat pulse-info">
+
+          <div class="market-stat-label">
+            Market State
+          </div>
+
+          <div class="market-stat-value">
+            <strong>
+              Neutral
+            </strong>
+          </div>
+
+          <div class="market-stat-change">
+            Based on current momentum
+          </div>
+
+        </div>
 
       </div>
 
-    </div>
+    </section>
 
 
-    <div class="analysis-layout">
+    <!-- =================================================
+         MARKETS
+    ================================================== -->
 
-      <!-- CHART -->
+    <section
+      id="markets"
+      class="section"
+    >
 
-      <div class="chart-panel">
+      <div class="section-header">
 
-        <div class="chart-header">
+        <div>
 
-          <div class="selected-asset">
+          <h2 class="section-title">
+            Top Markets
+          </h2>
 
-            <div class="asset-icon">
-              ₿
-            </div>
+          <p class="section-subtitle">
+            Leading cryptocurrencies by market capitalization.
+          </p>
 
-            <div>
+        </div>
+
+      </div>
+
+
+      <div id="coinGrid" class="coin-grid">
+
+        <div class="loading-card">
+          Loading market data...
+        </div>
+
+      </div>
+
+    </section>
+
+
+    <!-- =================================================
+         CHART
+    ================================================== -->
+
+    <section
+      id="analysis"
+      class="section"
+    >
+
+      <div class="section-header">
+
+        <div>
+
+          <h2 class="section-title">
+            Professional Analysis
+          </h2>
+
+          <p class="section-subtitle">
+            Technical chart and market intelligence.
+          </p>
+
+        </div>
+
+      </div>
+
+
+      <div class="chart-layout">
+
+
+        <!-- CHART -->
+
+        <div class="card chart-panel">
+
+          <div class="chart-header">
+
+            <div class="selected-asset">
 
               <strong>
                 Bitcoin
@@ -543,295 +395,350 @@ content="#070b14"
                 BTC
               </span>
 
+              <div class="chart-price">
+
+                <strong>
+                  --
+                </strong>
+
+                <span>
+                  --
+                </span>
+
+              </div>
+
+            </div>
+
+
+            <div class="time-buttons">
+
+              <button
+                class="time-button active"
+                data-interval="15"
+                type="button"
+              >
+                15m
+              </button>
+
+              <button
+                class="time-button"
+                data-interval="60"
+                type="button"
+              >
+                1H
+              </button>
+
+              <button
+                class="time-button"
+                data-interval="240"
+                type="button"
+              >
+                4H
+              </button>
+
+              <button
+                class="time-button"
+                data-interval="D"
+                type="button"
+              >
+                1D
+              </button>
+
+              <button
+                class="time-button"
+                data-interval="W"
+                type="button"
+              >
+                1W
+              </button>
+
             </div>
 
           </div>
 
 
-          <div class="chart-price">
-
-            <strong>
-              --
-            </strong>
-
-            <span>
-              --
-            </span>
-
-          </div>
-
-        </div>
-
-
-        <!-- TradingView -->
-
-        <div
-          id="tradingview-widget"
-          class="tradingview-widget-container"
-          style="
-            width:100%;
-            height:480px;
-          "
-        >
-
           <div
-            style="
-              width:100%;
-              height:100%;
-              display:flex;
-              align-items:center;
-              justify-content:center;
-              color:#7d899e;
-            "
+            id="tradingview-widget"
+            class="chart-container"
           >
-            Loading TradingView...
+
+            <div
+              class="loading-card"
+              style="height:100%"
+            >
+              Loading TradingView...
+            </div>
+
           </div>
 
         </div>
+
+
+        <!-- TECHNICAL INDICATORS -->
+
+        <aside class="card analysis-panel">
+
+          <h3 class="analysis-title">
+            Technical Snapshot
+          </h3>
+
+
+          <div class="indicator-list">
+
+
+            <div class="indicator-row">
+
+              <span>
+                Price
+              </span>
+
+              <strong>
+                --
+              </strong>
+
+            </div>
+
+
+            <div class="indicator-row">
+
+              <span>
+                24H Change
+              </span>
+
+              <strong>
+                --
+              </strong>
+
+            </div>
+
+
+            <div class="indicator-row">
+
+              <span>
+                24H Volume
+              </span>
+
+              <strong>
+                --
+              </strong>
+
+            </div>
+
+
+            <div class="indicator-row">
+
+              <span>
+                RSI
+              </span>
+
+              <strong>
+                --
+              </strong>
+
+            </div>
+
+
+            <div class="indicator-row">
+
+              <span>
+                Momentum
+              </span>
+
+              <strong>
+                --
+              </strong>
+
+            </div>
+
+          </div>
+
+        </aside>
 
       </div>
 
-
-      <!-- TECHNICAL SIGNALS -->
-
-      <aside class="technical-panel">
-
-        <div class="panel-heading">
-
-          <div>
-
-            <span class="section-kicker">
-              SIGNAL ENGINE
-            </span>
-
-            <h3>
-              Technical Score
-            </h3>
-
-          </div>
-
-          <div class="score-small">
-            --
-          </div>
-
-        </div>
+    </section>
 
 
-        <div class="indicator-list">
+    <!-- =================================================
+         AI
+    ================================================== -->
 
-          <div class="indicator-row">
+    <section
+      class="section"
+    >
 
-            <span>
-              Current Price
-            </span>
+      <div class="section-header">
 
-            <strong>
-              --
-            </strong>
+        <div>
 
-          </div>
+          <h2 class="section-title">
+            AI Market Intelligence
+          </h2>
 
-
-          <div class="indicator-row">
-
-            <span>
-              24H Momentum
-            </span>
-
-            <strong>
-              --
-            </strong>
-
-          </div>
-
-
-          <div class="indicator-row">
-
-            <span>
-              Volume
-            </span>
-
-            <strong>
-              --
-            </strong>
-
-          </div>
-
-
-          <div class="indicator-row">
-
-            <span>
-              RSI
-            </span>
-
-            <strong class="positive-text">
-              AI
-            </strong>
-
-          </div>
-
-
-          <div class="indicator-row">
-
-            <span>
-              MACD
-            </span>
-
-            <strong class="positive-text">
-              AI
-            </strong>
-
-          </div>
-
-        </div>
-
-
-        <div class="signal-box">
-
-          <span>
-            AI SIGNAL
-          </span>
-
-          <strong>
-            Monitoring
-          </strong>
-
-          <p>
-            The engine evaluates momentum,
-            volume and market conditions.
+          <p class="section-subtitle">
+            Automated interpretation of current market conditions.
           </p>
 
         </div>
 
-      </aside>
-
-    </div>
-
-  </section>
-
-
-  <!-- =================================================
-       PREDICTIONS
-  ================================================== -->
-
-  <section
-    id="predictions"
-    class="section"
-  >
-
-    <div class="section-heading">
-
-      <div>
-
-        <span class="section-kicker">
-          PROBABILITY ENGINE
-        </span>
-
-        <h2>
-          AI Market Forecast
-        </h2>
-
-        <p>
-          Model-based scenarios — not financial advice.
-        </p>
-
-      </div>
-
-    </div>
-
-
-    <div class="prediction-grid">
-
-      <div class="prediction-card">
-
-        <span>
-          SHORT TERM
-        </span>
-
-        <strong class="prediction-target">
-          --
-        </strong>
-
-        <small>
-          Next days
-        </small>
-
       </div>
 
 
-      <div class="prediction-card featured">
+      <div class="ai-panel">
 
-        <span>
-          MEDIUM TERM
-        </span>
 
-        <strong class="prediction-target">
-          --
-        </strong>
+        <article class="ai-card">
 
-        <small>
-          Next weeks
-        </small>
+          <h3>
+            Market Signal
+          </h3>
+
+          <p>
+            CryptoVision evaluates momentum,
+            price movement and market activity
+            to generate a simplified market signal.
+          </p>
+
+
+          <div class="ai-score">
+
+            <div class="score-circle">
+
+              <span class="score-small">
+                --
+              </span>
+
+            </div>
+
+            <div>
+
+              <strong>
+                Confidence
+              </strong>
+
+              <p>
+                Current market strength
+              </p>
+
+            </div>
+
+          </div>
+
+        </article>
+
+
+        <article class="ai-card">
+
+          <h3>
+            AI Insight
+          </h3>
+
+          <p>
+            Market conditions are continuously
+            evaluated using available market data.
+            This information is educational and
+            should not be considered financial advice.
+          </p>
+
+        </article>
 
       </div>
 
-
-      <div class="prediction-card">
-
-        <span>
-          LONG TERM
-        </span>
-
-        <strong class="prediction-target">
-          --
-        </strong>
-
-        <small>
-          Next months
-        </small>
-
-      </div>
-
-    </div>
+    </section>
 
 
-    <div class="disclaimer">
+    <!-- =================================================
+         PREDICTIONS
+    ================================================== -->
 
-      ⚠ Predictions are statistical scenarios based
-      on available market data. They are not guaranteed
-      prices and should not be considered financial advice.
+    <section
+      id="predictions"
+      class="section"
+    >
 
-    </div>
-
-  </section>
-
-
-  <!-- =================================================
-       SCANNER
-  ================================================== -->
-
-  <section
-    id="scanner"
-    class="section"
-  >
-
-    <div class="scanner-panel">
-
-      <div class="scanner-header">
+      <div class="section-header">
 
         <div>
 
-          <span class="section-kicker">
-            OPPORTUNITY DETECTOR
+          <h2 class="section-title">
+            Price Outlook
+          </h2>
+
+          <p class="section-subtitle">
+            Scenario-based projections from current momentum.
+          </p>
+
+        </div>
+
+      </div>
+
+
+      <div class="prediction-grid">
+
+
+        <article class="prediction-card">
+
+          <span>
+            Short Term
           </span>
 
-          <h2>
+          <strong class="prediction-target">
+            --
+          </strong>
+
+        </article>
+
+
+        <article class="prediction-card">
+
+          <span>
+            Medium Term
+          </span>
+
+          <strong class="prediction-target">
+            --
+          </strong>
+
+        </article>
+
+
+        <article class="prediction-card">
+
+          <span>
+            Long Term
+          </span>
+
+          <strong class="prediction-target">
+            --
+          </strong>
+
+        </article>
+
+
+      </div>
+
+    </section>
+
+
+    <!-- =================================================
+         SCANNER
+    ================================================== -->
+
+    <section
+      id="scanner"
+      class="section"
+    >
+
+      <div class="section-header">
+
+        <div>
+
+          <h2 class="section-title">
             Market Scanner
           </h2>
 
-          <p>
-            Find coins showing unusual momentum
-            and activity.
+          <p class="section-subtitle">
+            Detect assets showing strong current momentum.
           </p>
 
         </div>
@@ -840,328 +747,188 @@ content="#070b14"
         <button
           id="runScanner"
           class="primary-button"
+          type="button"
         >
-          ✦ Scan Market
+          Run Scanner
         </button>
 
       </div>
 
 
-      <div class="scanner-results">
+      <div class="scanner-layout">
 
-        <div class="scanner-empty">
 
-          <div class="empty-icon">
-            ⌁
+        <div class="card">
+
+          <div class="card-header">
+
+            <strong>
+              Opportunities
+            </strong>
+
           </div>
 
-          <strong>
-            Scanner ready
-          </strong>
 
-          <p>
-            Click Scan Market to analyze
-            current opportunities.
-          </p>
+          <div class="card-body">
+
+            <div class="scanner-results">
+
+              <div class="scanner-empty">
+                Press Run Scanner to analyze the market.
+              </div>
+
+            </div>
+
+          </div>
 
         </div>
 
-      </div>
 
-    </div>
+        <div class="card">
 
-  </section>
+          <div class="card-header">
 
+            <strong>
+              Scanner Logic
+            </strong>
 
-  <!-- =================================================
-       MEME RADAR
-  ================================================== -->
-
-  <section
-    id="meme-radar"
-    class="section"
-  >
-
-    <div class="section-heading">
-
-      <div>
-
-        <span class="section-kicker">
-          HIGH-RISK / HIGH-VOLATILITY
-        </span>
-
-        <h2>
-          Meme Coin Radar
-        </h2>
-
-        <p>
-          Discover emerging meme-coin activity
-          using multiple market signals.
-        </p>
-
-      </div>
-
-      <span class="live-badge">
-        RADAR ACTIVE
-      </span>
-
-    </div>
+          </div>
 
 
-    <div class="meme-grid">
+          <div class="card-body">
 
-      <div class="meme-card">
+            <p class="section-subtitle">
+              Ranking currently loaded assets
+              according to recent price momentum.
+            </p>
 
-        <div class="meme-icon">
-          🚀
+          </div>
+
         </div>
+
+
+      </div>
+
+    </section>
+
+
+    <!-- =================================================
+         MEME RADAR
+    ================================================== -->
+
+    <section
+      id="meme-radar"
+      class="section"
+    >
+
+      <div class="section-header">
 
         <div>
 
-          <strong>
-            Social Momentum
-          </strong>
+          <h2 class="section-title">
+            Meme Radar
+          </h2>
 
-          <p>
-            X / social activity monitoring
+          <p class="section-subtitle">
+            A dedicated area for high-volatility meme coin monitoring.
           </p>
 
         </div>
 
-        <span class="radar-status">
-          READY
-        </span>
-
       </div>
 
 
-      <div class="meme-card">
+      <div class="card">
 
-        <div class="meme-icon">
-          ⚡
+        <div class="card-body">
+
+          <div class="ai-panel">
+
+
+            <article class="ai-card">
+
+              <h3>
+                Meme Momentum
+              </h3>
+
+              <p>
+                This module will monitor meme assets,
+                volume acceleration, liquidity,
+                social activity and market momentum.
+              </p>
+
+            </article>
+
+
+            <article class="ai-card">
+
+              <h3>
+                Social Signals
+              </h3>
+
+              <p>
+                Social and X-based signals can be
+                integrated here after connecting
+                reliable data sources.
+              </p>
+
+            </article>
+
+
+          </div>
+
         </div>
 
-        <div>
+      </div>
 
-          <strong>
-            Volume Spike
-          </strong>
+    </section>
 
-          <p>
-            Detect unusual trading activity
+
+    <!-- =================================================
+         DISCLAIMER
+    ================================================== -->
+
+    <section class="section">
+
+      <div class="card">
+
+        <div class="card-body">
+
+          <p
+            class="section-subtitle"
+            style="line-height:1.7"
+          >
+            <strong>
+              Risk notice:
+            </strong>
+            CryptoVision provides market information,
+            technical analysis and automated scenarios
+            for educational purposes only. Cryptocurrency
+            markets are highly volatile. Nothing on this
+            website constitutes financial or investment advice.
           </p>
 
         </div>
 
-        <span class="radar-status">
-          READY
-        </span>
-
       </div>
 
-
-      <div class="meme-card">
-
-        <div class="meme-icon">
-          🧠
-        </div>
-
-        <div>
-
-          <strong>
-            AI Ranking
-          </strong>
-
-          <p>
-            Rank opportunities by multiple signals
-          </p>
-
-        </div>
-
-        <span class="radar-status">
-          READY
-        </span>
-
-      </div>
-
-    </div>
+    </section>
 
 
-    <div class="disclaimer">
+    <!-- =================================================
+         FOOTER
+    ================================================== -->
 
-      ⚠ Meme coins can experience extreme volatility,
-      liquidity risks, manipulation and rapid losses.
-      Always verify a token before trading.
+    <footer class="footer">
 
-    </div>
+      CryptoVision © 2026
 
-  </section>
-
-
-  <!-- =================================================
-       WATCHLIST
-  ================================================== -->
-
-  <section
-    id="watchlist"
-    class="section"
-  >
-
-    <div class="section-heading">
-
-      <div>
-
-        <span class="section-kicker">
-          PERSONAL TRACKING
-        </span>
-
-        <h2>
-          Your Watchlist
-        </h2>
-
-      </div>
-
-    </div>
+    </footer>
 
 
-    <div class="watchlist-panel">
-
-      <div class="watchlist-empty">
-
-        <div class="empty-icon">
-          ☆
-        </div>
-
-        <h3>
-          Your watchlist is empty
-        </h3>
-
-        <p>
-          Click the star on a coin to add it here.
-        </p>
-
-      </div>
-
-    </div>
-
-  </section>
-
-
-  <!-- =================================================
-       AI FOOTER
-  ================================================== -->
-
-  <section class="ai-footer">
-
-    <div class="ai-footer-icon">
-      ✦
-    </div>
-
-    <div>
-
-      <span>
-        CRYPTOVISION INTELLIGENCE
-      </span>
-
-      <h3>
-        Data → Signals → Scenarios
-      </h3>
-
-      <p>
-        Built to transform market data into
-        actionable intelligence.
-      </p>
-
-    </div>
-
-  </section>
-
-
-  <footer class="footer">
-
-    <span>
-      © 2026 CryptoVision
-    </span>
-
-    <span>
-      Market data powered by public APIs
-    </span>
-
-    <span>
-      Not financial advice
-    </span>
-
-  </footer>
+  </div>
 
 </main>
 
-  </div>  <!-- =====================================================
-       SEARCH OVERLAY
-  ====================================================== -->  <div
-    id="searchOverlay"
-    class="search-overlay"
-    hidden
-  ><div class="search-modal">
-
-  <div class="search-modal-header">
-
-    <strong>
-      Search Markets
-    </strong>
-
-    <button
-      class="modal-close"
-      onclick="closeSearch()"
-    >
-      ×
-    </button>
-
-  </div>
-
-  <div
-    id="searchResults"
-    class="search-results"
-  >
-  </div>
-
-</div>
-
-  </div>  <!-- =====================================================
-       ANALYSIS MODAL
-  ====================================================== -->  <div
-    id="analysisModal"
-    class="modal-overlay"
-    hidden
-  ><div class="modal">
-
-  <button
-    class="modal-close"
-    aria-label="Close"
-  >
-    ×
-  </button>
-
-  <div class="modal-content">
-
-    <span class="section-kicker">
-      AI ANALYSIS
-    </span>
-
-    <h2>
-      Market Intelligence
-    </h2>
-
-    <p>
-      Advanced analysis will combine market
-      structure, technical indicators, volume,
-      sentiment and external signals.
-    </p>
-
-  </div>
-
-</div>
-
-  </div>  <!-- =====================================================
-       SCRIPTS
-  ====================================================== -->  <script src="script.js"></script></body>
-      </html>
+  </div>  <script src="script.js"></script></body>
+  </html>
