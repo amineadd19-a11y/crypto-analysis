@@ -3,66 +3,420 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CryptoVision</title>
+
+  <title>CryptoVision — Crypto Analysis</title>
+
+  <meta
+    name="description"
+    content="CryptoVision provides cryptocurrency market data, analysis, trend scores and educational growth scenarios."
+  >
+
   <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
 
-<header>
+<header class="header">
+
   <div class="nav">
-    <div class="logo">Crypto<span>Vision</span></div>
+
+    <a href="#" class="logo">
+      Crypto<span>Vision</span>
+    </a>
 
     <nav>
       <a href="#market">Market</a>
       <a href="#analysis">Analysis</a>
+      <a href="#trending">Trending</a>
       <a href="#about">About</a>
     </nav>
 
-    <button onclick="loadMarket()">↻ Refresh</button>
+    <button id="refreshBtn" class="refresh-btn">
+      ↻ Refresh
+    </button>
+
   </div>
+
 </header>
+
 
 <main>
 
+<!-- HERO -->
+
 <section class="hero">
 
-  <div class="hero-text">
+  <div class="hero-content">
 
     <div class="badge">
-      ● LIVE MARKET DATA
+      ● LIVE CRYPTO MARKET
     </div>
 
     <h1>
-      Understand crypto.<br>
+      Understand crypto.
       <span>Before you trade.</span>
     </h1>
 
     <p>
-      Free cryptocurrency analysis, market trends
-      and growth scenarios for major cryptocurrencies.
+      Track cryptocurrency prices, market momentum,
+      trends and educational growth scenarios in one place.
     </p>
 
-    <a class="cta" href="#market">
-      Explore the market →
-    </a>
+    <div class="hero-actions">
 
-    <small>
+      <a href="#market" class="primary-btn">
+        Explore Market →
+      </a>
+
+      <a href="#analysis" class="secondary-btn">
+        View Analysis
+      </a>
+
+    </div>
+
+    <small class="disclaimer">
       Educational information only — not financial advice.
     </small>
 
   </div>
 
-  <div class="hero-card">
 
-    <p>BTC / USD</p>
+  <div class="hero-market-card">
 
-    <h2 id="btcPrice">
+    <div class="card-label">
+      BTC / USD
+    </div>
+
+    <div id="btcPrice" class="hero-price">
       Loading...
-    </h2>
+    </div>
 
-    <span id="btcChange">
+    <div id="btcChange" class="hero-change">
       Updating...
+    </div>
+
+    <div class="btc-info">
+
+      <span>
+        Market leader
+      </span>
+
+      <span>
+        #1
+      </span>
+
+    </div>
+
+  </div>
+
+</section>
+
+
+<!-- MARKET -->
+
+<section id="market" class="section">
+
+  <div class="section-heading">
+
+    <div>
+
+      <small>MARKET OVERVIEW</small>
+
+      <h2>
+        Cryptocurrency Market
+      </h2>
+
+      <p>
+        Explore the leading cryptocurrencies by market capitalization.
+      </p>
+
+    </div>
+
+    <span id="updated" class="updated">
+      Waiting for market data...
+    </span>
+
+  </div>
+
+
+  <div class="market-tools">
+
+    <div class="search-box">
+
+      <span>⌕</span>
+
+      <input
+        id="coinSearch"
+        type="search"
+        placeholder="Search Bitcoin, Ethereum..."
+        autocomplete="off"
+      >
+
+    </div>
+
+
+    <select id="coinSort">
+
+      <option value="rank">
+        Market Cap Rank
+      </option>
+
+      <option value="price">
+        Price
+      </option>
+
+      <option value="change">
+        24h Change
+      </option>
+
+      <option value="volume">
+        Volume
+      </option>
+
+      <option value="marketcap">
+        Market Cap
+      </option>
+
+    </select>
+
+  </div>
+
+
+  <div id="coins" class="coins">
+
+    <div class="loading-card">
+      Loading market data...
+    </div>
+
+  </div>
+
+</section>
+
+
+<!-- COIN DETAILS -->
+
+<section
+  id="coinDetails"
+  class="coin-details hidden"
+>
+
+  <div class="details-heading">
+
+    <div>
+
+      <small>COIN ANALYSIS</small>
+
+      <h2 id="selectedCoinName">
+        Cryptocurrency
+      </h2>
+
+      <p id="selectedCoinSymbol">
+        —
+      </p>
+
+    </div>
+
+    <button
+      id="closeDetails"
+      class="close-btn"
+    >
+      ✕ Close
+    </button>
+
+  </div>
+
+
+  <div class="details-grid">
+
+    <div class="detail-card">
+
+      <span>
+        Current Price
+      </span>
+
+      <strong id="detailPrice">
+        —
+      </strong>
+
+    </div>
+
+
+    <div class="detail-card">
+
+      <span>
+        24h Change
+      </span>
+
+      <strong id="detailChange">
+        —
+      </strong>
+
+    </div>
+
+
+    <div class="detail-card">
+
+      <span>
+        Market Cap
+      </span>
+
+      <strong id="detailMarketCap">
+        —
+      </strong>
+
+    </div>
+
+
+    <div class="detail-card">
+
+      <span>
+        24h Volume
+      </span>
+
+      <strong id="detailVolume">
+        —
+      </strong>
+
+    </div>
+
+  </div>
+
+
+  <div class="analysis-panel">
+
+    <div class="score">
+
+      <div class="score-number">
+
+        <strong id="coinScore">
+          —
+        </strong>
+
+        <span>
+          /100
+        </span>
+
+      </div>
+
+      <small>
+        CRYPTOVISION SCORE
+      </small>
+
+    </div>
+
+
+    <div class="analysis-text">
+
+      <small>
+        MARKET SIGNAL
+      </small>
+
+      <h3 id="coinSignal">
+        Analyzing...
+      </h3>
+
+      <p id="coinExplanation">
+        Select a cryptocurrency to generate its market analysis.
+      </p>
+
+    </div>
+
+  </div>
+
+
+  <div class="chart-container">
+
+    <div class="chart-header">
+
+      <div>
+
+        <small>
+          PRICE PERFORMANCE
+        </small>
+
+        <h3>
+          Market trend
+        </h3>
+
+      </div>
+
+      <span id="chartPeriod">
+        24H
+      </span>
+
+    </div>
+
+    <div id="coinChart" class="chart">
+
+      Chart will appear here.
+
+    </div>
+
+  </div>
+
+
+  <div class="prediction-grid">
+
+    <div class="prediction-card">
+
+      <small>
+        SHORT TERM
+      </small>
+
+      <strong id="shortPrediction">
+        —
+      </strong>
+
+      <p>
+        Educational scenario based on current market momentum.
+      </p>
+
+    </div>
+
+
+    <div class="prediction-card">
+
+      <small>
+        MEDIUM TERM
+      </small>
+
+      <strong id="mediumPrediction">
+        —
+      </strong>
+
+      <p>
+        Scenario based on current trend and market conditions.
+      </p>
+
+    </div>
+
+
+    <div class="prediction-card">
+
+      <small>
+        LONG TERM
+      </small>
+
+      <strong id="longPrediction">
+        —
+      </strong>
+
+      <p>
+        Long-term scenario with higher uncertainty.
+      </p>
+
+    </div>
+
+  </div>
+
+
+  <div class="risk-warning">
+
+    ⚠️
+    <span>
+      Cryptocurrency markets are highly volatile.
+      These scenarios are estimates for educational purposes
+      and are not guaranteed predictions.
     </span>
 
   </div>
@@ -70,159 +424,290 @@
 </section>
 
 
-<section id="market" class="section">
-
-  <div class="section-title">
-
-    <div>
-      <small>MARKET OVERVIEW</small>
-      <h2>Top cryptocurrencies</h2>
-    </div>
-
-    <span id="updated"></span>
-
-  </div>
-
-  <div class="market-tools">
-
-  <input
-    id="coinSearch"
-    type="search"
-    placeholder="Search cryptocurrency..."
-    autocomplete="off"
-  />
-
-  <select id="coinSort">
-    <option value="rank">Market Cap Rank</option>
-    <option value="price">Price</option>
-    <option value="change">24h Change</option>
-    <option value="volume">Volume</option>
-  </select>
-
-</div>
-
-<div id="coins" class="coins">
-  Loading market data...
-</div>
-
-</section>
-
+<!-- MARKET ANALYSIS -->
 
 <section id="analysis" class="section">
 
-  <small>FREE ANALYSIS</small>
+  <div class="section-heading">
 
-  <h2>Growth scenarios</h2>
+    <div>
+
+      <small>MARKET INTELLIGENCE</small>
+
+      <h2>
+        Market Analysis
+      </h2>
+
+      <p>
+        A simple overview of the current market momentum.
+      </p>
+
+    </div>
+
+  </div>
+
 
   <div class="analysis-grid">
 
-    <div class="card">
 
-      <h3>📈 Momentum</h3>
+    <div class="analysis-card">
 
-      <div class="progress">
-        <div id="momentumBar"></div>
+      <div class="analysis-icon">
+        📈
       </div>
 
+      <small>
+        MARKET MOMENTUM
+      </small>
+
+      <div class="momentum-bar">
+
+        <div
+          id="momentumBar"
+          class="momentum-fill"
+        ></div>
+
+      </div>
+
+      <strong id="momentumValue">
+        —
+      </strong>
+
       <p id="momentumText">
-        Analyzing...
+        Analyzing market momentum...
       </p>
 
     </div>
 
 
-    <div class="card">
+    <div class="analysis-card">
 
-      <h3>🎯 Short term</h3>
+      <div class="analysis-icon">
+        🎯
+      </div>
+
+      <small>
+        SHORT TERM
+      </small>
 
       <strong id="shortTerm">
         —
       </strong>
 
       <p>
-        Possible scenario based on current momentum.
+        Possible market scenario based on current momentum.
       </p>
 
     </div>
 
 
-    <div class="card">
+    <div class="analysis-card">
 
-      <h3>🗓 Medium term</h3>
+      <div class="analysis-icon">
+        🗓
+      </div>
+
+      <small>
+        MEDIUM TERM
+      </small>
 
       <strong id="mediumTerm">
         —
       </strong>
 
       <p>
-        Possible scenario if the current trend continues.
+        Possible scenario if current conditions continue.
+      </p>
+
+    </div>
+
+
+    <div class="analysis-card">
+
+      <div class="analysis-icon">
+        ⚡
+      </div>
+
+      <small>
+        MARKET TREND
+      </small>
+
+      <strong id="marketTrend">
+        —
+      </strong>
+
+      <p id="marketTrendText">
+        Waiting for market data.
       </p>
 
     </div>
 
   </div>
 
+
   <div class="warning">
-    ⚠️ Estimates are educational scenarios,
-    not guaranteed predictions.
-    Cryptocurrency markets are highly volatile.
+
+    ⚠️
+
+    <span>
+      CryptoVision provides educational market analysis.
+      Nothing on this website should be considered financial advice.
+    </span>
+
   </div>
 
 </section>
 
+
+<!-- TRENDING -->
+
+<section id="trending" class="section">
+
+  <div class="section-heading">
+
+    <div>
+
+      <small>MARKET MOVERS</small>
+
+      <h2>
+        Trending Cryptocurrencies
+      </h2>
+
+      <p>
+        Cryptocurrencies showing notable market activity.
+      </p>
+
+    </div>
+
+  </div>
+
+
+  <div id="trendingCoins" class="trending-grid">
+
+    <div class="loading-card">
+      Loading trending cryptocurrencies...
+    </div>
+
+  </div>
+
+</section>
+
+
+<!-- FEATURES -->
 
 <section id="about" class="section about">
 
-  <small>WHY CRYPTOVISION?</small>
+  <div class="section-heading">
 
-  <h2>
-    Simple analysis. Clear signals.
-  </h2>
+    <div>
 
-  <p>
-    CryptoVision combines market data and simple indicators
-    to make cryptocurrency analysis easier to understand.
-  </p>
+      <small>WHY CRYPTOVISION?</small>
+
+      <h2>
+        Simple analysis.
+        Clear signals.
+      </h2>
+
+      <p>
+        CryptoVision combines market data and simple indicators
+        to make cryptocurrency analysis easier to understand.
+      </p>
+
+    </div>
+
+  </div>
+
 
   <div class="features">
 
-    <div>
-      <b>01</b>
-      <h3>Live prices</h3>
+
+    <div class="feature">
+
+      <span>
+        01
+      </span>
+
+      <h3>
+        Live Prices
+      </h3>
+
       <p>
-        Follow current prices of major cryptocurrencies.
+        Follow current cryptocurrency prices and market movements.
       </p>
+
     </div>
 
-    <div>
-      <b>02</b>
-      <h3>Trend score</h3>
+
+    <div class="feature">
+
+      <span>
+        02
+      </span>
+
+      <h3>
+        Market Score
+      </h3>
+
       <p>
-        Understand market momentum at a glance.
+        Understand momentum and market conditions with a simple score.
       </p>
+
     </div>
 
-    <div>
-      <b>03</b>
-      <h3>Growth scenarios</h3>
+
+    <div class="feature">
+
+      <span>
+        03
+      </span>
+
+      <h3>
+        Growth Scenarios
+      </h3>
+
       <p>
-        Explore possible future price ranges.
+        Explore possible future scenarios across different timeframes.
       </p>
+
+    </div>
+
+
+    <div class="feature">
+
+      <span>
+        04
+      </span>
+
+      <h3>
+        Market Discovery
+      </h3>
+
+      <p>
+        Search and discover cryptocurrencies based on market activity.
+      </p>
+
     </div>
 
   </div>
 
 </section>
+
 
 </main>
 
 
 <footer>
 
-  <div>CryptoVision</div>
+  <div class="footer-logo">
+    Crypto<span>Vision</span>
+  </div>
 
   <div>
-    © 2026 — Educational crypto analytics
+    © 2026 CryptoVision
+  </div>
+
+  <div>
+    Educational crypto analytics
   </div>
 
 </footer>
@@ -231,4 +716,4 @@
 <script src="script.js"></script>
 
 </body>
-</html>
+  </html>
