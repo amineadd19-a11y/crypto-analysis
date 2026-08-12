@@ -9,6 +9,130 @@ localStorage.getItem("cv_favorites") || "[]"
 )
 };
 
+/* =========================
+FETCH WRAPPER WITH RETRY & CACHE
+========================= */
+
+function createFetchWrapper() {
+const cache = {};
+const CACHE_TTL = 60000;
+
+return async function safeFetch(url, options = {}) {
+const timeout = options.timeout || 10000;
+const maxRetries = options.maxRetries || 2;
+const useCache = options.useCache !== false;
+
+const cacheKey =
+  "cache_" + url;
+
+if (useCache) {
+  const cached =
+    sessionStorage.getItem(
+      cacheKey
+    );
+
+  if (cached) {
+    const entry = JSON.parse(
+      cached
+    );
+
+    if (
+      Date.now() - entry.time <
+      CACHE_TTL
+    ) {
+      return new Response(
+        JSON.stringify(
+          entry.data
+        ),
+        { status: 200 }
+      );
+    }
+  }
+}
+
+let lastError;
+
+for (
+  let attempt = 0;
+  attempt <= maxRetries;
+  attempt++
+) {
+  try {
+    const controller =
+      new AbortController();
+
+    const timeoutId =
+      setTimeout(
+        function () {
+          controller.abort();
+        },
+        timeout
+      );
+
+    const response =
+      await fetch(url, {
+        ...options,
+        signal:
+          controller.signal
+      });
+
+    clearTimeout(timeoutId);
+
+    if (response.ok) {
+      const data =
+        await response.clone()
+          .json();
+
+      if (useCache) {
+        sessionStorage.setItem(
+          cacheKey,
+          JSON.stringify({
+            data: data,
+            time: Date.now()
+          })
+        );
+      }
+
+      return response;
+    }
+
+    if (response.status >= 500) {
+      throw new Error(
+        "Server error " +
+        response.status
+      );
+    }
+
+    return response;
+
+  } catch (error) {
+    lastError = error;
+
+    if (attempt < maxRetries) {
+      const delay =
+        Math.pow(2, attempt) *
+        1000;
+
+      await new Promise(
+        function (resolve) {
+          setTimeout(
+            resolve,
+            delay
+          );
+        }
+      );
+    }
+  }
+}
+
+throw lastError ||
+  new Error("Fetch failed");
+};
+}
+
+const safeFetch =
+createFetchWrapper();
+
 function $(selector) {
 return document.querySelector(selector);
 }
@@ -74,10 +198,16 @@ const grid = $("#coinGrid");
 
 if (!grid) return;
 
-grid.innerHTML =
-'<div class="loading-card">' +
-text +
-"</div>";
+const card =
+document.createElement("div");
+
+card.className =
+"loading-card";
+
+card.textContent = text;
+
+grid.innerHTML = "";
+grid.appendChild(card);
 }
 
 async function loadCoins() {
@@ -90,7 +220,8 @@ API_URL +
 "&sparkline=false" +
 "&price_change_percentage=24h,7d";
 
-const response = await fetch(url);
+const response =
+await safeFetch(url);
 
 if (!response.ok) {
 throw new Error(
@@ -118,10 +249,16 @@ if (!grid) return;
 grid.innerHTML = "";
 
 if (!coins.length) {
-grid.innerHTML =
-'<div class="loading-card">' +
-"No coins found." +
-"</div>";
+const card =
+document.createElement("div");
+
+card.className =
+"loading-card";
+
+card.textContent =
+"No coins found.";
+
+grid.appendChild(card);
 
 return;
 
@@ -747,8 +884,16 @@ $(".scanner-results");
   if (!result) return;
 
   if (!state.coins.length) {
-    result.innerHTML =
-      "<p>Market data is loading...</p>";
+    const msg =
+document.createElement(
+"p"
+);
+
+    msg.textContent =
+"Market data is loading...";
+
+    result.innerHTML = "";
+    result.appendChild(msg);
 
     return;
   }
