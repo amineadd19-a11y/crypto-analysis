@@ -356,12 +356,26 @@ if (!title || !chart) {
   return;
 }
 
-title.innerHTML = `
-  <div>
-    <strong>${name}</strong>
-    <span>${ticker}</span>
-  </div>
-`;
+title.innerHTML = "";
+
+const titleDiv =
+document.createElement("div");
+
+const titleStrong =
+document.createElement("strong");
+
+titleStrong.textContent = name;
+
+titleDiv.appendChild(titleStrong);
+
+const titleSpan =
+document.createElement("span");
+
+titleSpan.textContent = ticker;
+
+titleDiv.appendChild(titleSpan);
+
+title.appendChild(titleDiv);
 
 createTradingView(
   chart,
