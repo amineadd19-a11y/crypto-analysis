@@ -21,6 +21,123 @@
     "fartcoin"
   ];
 
+  /* Safe fetch wrapper */
+  function createSafeFetch() {
+    const CACHE_TTL = 60000;
+
+    return async function safeFetch(url, opts = {}) {
+      const timeout = opts.timeout || 10000;
+      const maxRetries = opts.maxRetries || 2;
+      const useCache = opts.useCache !== false;
+      const cacheKey = "cache_" + url;
+
+      if (useCache) {
+        const cached =
+          sessionStorage.getItem(
+            cacheKey
+          );
+
+        if (cached) {
+          const entry = JSON.parse(
+            cached
+          );
+
+          if (
+            Date.now() - entry.time <
+            CACHE_TTL
+          ) {
+            return new Response(
+              JSON.stringify(
+                entry.data
+              ),
+              { status: 200 }
+            );
+          }
+        }
+      }
+
+      let lastError;
+
+      for (
+        let attempt = 0;
+        attempt <= maxRetries;
+        attempt++
+      ) {
+        try {
+          const controller =
+            new AbortController();
+
+          const timeoutId =
+            setTimeout(
+              function () {
+                controller.abort();
+              },
+              timeout
+            );
+
+          const response =
+            await fetch(url, {
+              ...opts,
+              signal:
+                controller.signal
+            });
+
+          clearTimeout(timeoutId);
+
+          if (response.ok) {
+            const data =
+              await response.clone()
+                .json();
+
+            if (useCache) {
+              sessionStorage.setItem(
+                cacheKey,
+                JSON.stringify({
+                  data: data,
+                  time: Date.now()
+                })
+              );
+            }
+
+            return response;
+          }
+
+          if (response.status >= 500) {
+            throw new Error(
+              "Server error " +
+              response.status
+            );
+          }
+
+          return response;
+
+        } catch (error) {
+          lastError = error;
+
+          if (attempt < maxRetries) {
+            const delay =
+              Math.pow(2, attempt) *
+              1000;
+
+            await new Promise(
+              function (resolve) {
+                setTimeout(
+                  resolve,
+                  delay
+                );
+              }
+            );
+          }
+        }
+      }
+
+      throw lastError ||
+        new Error("Fetch failed");
+    };
+  }
+
+  const safeFetch = createSafeFetch();
+
   const money = (value) => {
     if (!Number.isFinite(Number(value))) return "—";
 
@@ -282,11 +399,17 @@
       return;
     }
 
-    container.innerHTML = `
-      <div class="meme-loading">
-        🔄 Loading Meme Radar...
-      </div>
-    `;
+    const loadingDiv =
+      document.createElement("div");
+
+    loadingDiv.className =
+      "meme-loading";
+
+    loadingDiv.textContent =
+      "🔄 Loading Meme Radar...";
+
+    container.innerHTML = "";
+    container.appendChild(loadingDiv);
 
     try {
 
@@ -300,7 +423,7 @@
         `&price_change_percentage=24h`;
 
       const response =
-        await fetch(url);
+        await safeFetch(url);
 
       if (!response.ok) {
         throw new Error(
@@ -362,18 +485,40 @@
         error
       );
 
-      container.innerHTML = `
-        <div class="meme-error">
+      const errorDiv =
+        document.createElement("div");
 
-          ⚠️ Meme Radar is temporarily
-          unavailable.
+      errorDiv.className =
+        "meme-error";
 
-          <br><br>
+      errorDiv.innerHTML = "";
 
-          Please refresh the page.
+      const text1 =
+document.createTextNode(
+"⚠️ Meme Radar is temporarily unavailable."
+);
 
-        </div>
-      `;
+      errorDiv.appendChild(text1);
+
+      const br1 =
+document.createElement("br");
+
+      errorDiv.appendChild(br1);
+
+      const br2 =
+document.createElement("br");
+
+      errorDiv.appendChild(br2);
+
+      const text2 =
+document.createTextNode(
+"Please refresh the page."
+);
+
+      errorDiv.appendChild(text2);
+
+      container.innerHTML = "";
+      container.appendChild(errorDiv);
     }
   }
 
