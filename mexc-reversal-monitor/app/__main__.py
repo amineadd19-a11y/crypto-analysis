@@ -1,5 +1,6 @@
 from __future__ import annotations
 import asyncio, time
+import pandas as pd
 from .config import SETTINGS
 from .mexc import MEXCClient
 from .indicators import setup
@@ -10,14 +11,18 @@ class Scanner:
         self.mexc = MEXCClient(SETTINGS.symbols)
         self.last_alert: dict[tuple[str,str], float] = {}
         self.last_candle: dict[tuple[str,str], int] = {}
+        self.last_eval: dict[str, float] = {}
         self.sem = asyncio.Semaphore(8)
 
     async def evaluate(self, symbol: str, move1: float, move5: float):
-        # Candidate gate keeps REST traffic low while the ticker WS watches the full market.
         short_candidate = SETTINGS.enable_short and (move1 >= SETTINGS.move_1m_pct or move5 >= SETTINGS.move_5m_pct)
         long_candidate = SETTINGS.enable_long and (move1 <= -SETTINGS.move_1m_pct or move5 <= -SETTINGS.move_5m_pct)
         if not (short_candidate or long_candidate):
             return
+        now = time.time()
+        if now - self.last_eval.get(symbol, 0) < 20:
+            return
+        self.last_eval[symbol] = now
         async with self.sem:
             try:
                 candles = await self.mexc.klines(symbol, "Min1", 120)
@@ -26,20 +31,26 @@ class Scanner:
                 for direction, enabled in (("SHORT", short_candidate), ("LONG", long_candidate)):
                     if not enabled:
                         continue
-                    signal = setup(__import__('pandas').DataFrame(candles), direction, SETTINGS.min_score)
+                    signal = setup(
+                        pd.DataFrame(candles), direction,
+                        min_score=SETTINGS.min_score,
+                        move_1m_pct=SETTINGS.move_1m_pct,
+                        move_5m_pct=SETTINGS.move_5m_pct,
+                        volume_ratio=SETTINGS.volume_ratio,
+                        ema_extension_pct=SETTINGS.ema_extension_pct,
+                        vwap_extension_pct=SETTINGS.vwap_extension_pct,
+                    )
                     if not signal:
                         continue
                     key = (symbol, direction)
-                    now = time.time()
-                    candle_id = candles[-1]["ts"]
                     if now - self.last_alert.get(key, 0) < SETTINGS.cooldown_minutes * 60:
                         continue
+                    candle_id = candles[-1]["ts"]
                     if SETTINGS.alert_once_per_candle and self.last_candle.get(key) == candle_id:
                         continue
                     self.last_alert[key] = now
                     self.last_candle[key] = candle_id
-                    text = format_alert(symbol, signal)
-                    await send_telegram(text)
+                    await send_telegram(format_alert(symbol, signal))
             except Exception as exc:
                 print(f"Evaluation error {symbol}: {exc}", flush=True)
 
