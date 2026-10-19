@@ -14,3 +14,7 @@ services:
         value: "true"
       - key: TRADING_ENABLED
         value: "false"
+      - key: REQUIRE_ACCESS_TOKEN
+        value: "true"
+      - key: AGENT_ACCESS_TOKEN
+        sync: false
