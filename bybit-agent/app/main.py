@@ -141,6 +141,42 @@ def health() -> dict:
     return {"status": "ok", "service": "bybit-ai-trader", "trading_enabled": False}
 
 
+@app.get("/api/bybit/account-connection")
+def bybit_account_connection() -> dict:
+    """Verify private Bybit API credentials without placing orders or returning balances."""
+    api_key = os.getenv("BYBIT_API_KEY", "").strip()
+    api_secret = os.getenv("BYBIT_API_SECRET", "").strip()
+    if not api_key or not api_secret:
+        raise HTTPException(
+            status_code=503,
+            detail="Bybit account connection is not configured. Add BYBIT_API_KEY and BYBIT_API_SECRET as server-side environment variables.",
+        )
+    try:
+        private_client = HTTP(
+            testnet=os.getenv("BYBIT_TESTNET", "false").lower() == "true",
+            api_key=api_key,
+            api_secret=api_secret,
+            timeout=10,
+            force_retry=False,
+        )
+        response = private_client.get_wallet_balance(accountType="UNIFIED")
+        if response.get("retCode") != 0:
+            # Do not return the raw exchange response or any credential-related details.
+            raise HTTPException(status_code=502, detail="Bybit rejected the private API connection. Check key permissions and testnet/mainnet selection.")
+        return {
+            "connected": True,
+            "environment": "testnet" if os.getenv("BYBIT_TESTNET", "false").lower() == "true" else "mainnet",
+            "account_type": "UNIFIED",
+            "trading_enabled": False,
+            "orders_placed": False,
+            "message": "Private Bybit API authentication succeeded. This endpoint is read-only and does not place orders.",
+        }
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=502, detail="Unable to authenticate with Bybit. Check API key permissions, IP restrictions, and environment selection.")
+
+
 @app.get("/api/market/tickers")
 def tickers(category: str = Query(default="linear", pattern="^(linear|spot)$")) -> dict:
     try:
