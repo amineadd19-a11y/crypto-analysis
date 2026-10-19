@@ -1,10 +1,11 @@
+import hmac
 import math
 import os
 from pathlib import Path
 from typing import Literal
 
-from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import FileResponse
+from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.responses import FileResponse, JSONResponse
 from pybit.unified_trading import HTTP
 
 app = FastAPI(
@@ -21,6 +22,30 @@ client = HTTP(
     max_retries=2,
     retry_delay=1,
 )
+
+# Public deployments can require a bearer token. Keep local development convenient,
+# but configure REQUIRE_ACCESS_TOKEN=true on any public host.
+@app.middleware("http")
+async def protect_public_endpoints(request: Request, call_next):
+    if request.url.path == "/health":
+        return await call_next(request)
+
+    require_token = os.getenv("REQUIRE_ACCESS_TOKEN", "false").lower() == "true"
+    expected_token = os.getenv("AGENT_ACCESS_TOKEN", "").strip()
+    if require_token and not expected_token:
+        return JSONResponse(
+            status_code=503,
+            content={"detail": "Service access protection is not configured."},
+        )
+    if expected_token:
+        supplied = request.headers.get("authorization", "")
+        expected_header = f"Bearer {expected_token}"
+        if not hmac.compare_digest(supplied, expected_header):
+            return JSONResponse(status_code=401, content={"detail": "Authentication required."})
+    elif require_token:
+        return JSONResponse(status_code=503, content={"detail": "Access token is not configured."})
+    return await call_next(request)
+
 ALLOWED_INTERVALS = {"1", "3", "5", "15", "30", "60", "120", "240", "360", "720", "D", "W", "M"}
 
 
