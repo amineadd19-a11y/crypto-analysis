@@ -13,11 +13,11 @@ h1{font-size:clamp(26px,5vw,42px);margin:28px 0 8px}p{color:var(--muted);line-he
 <header class="top"><div class="brand">BYBIT <span>AI TRADER</span></div><div class="pill">MARKET ANALYSIS • SAFE MODE</div></header>
 <h1>Trading Intelligence</h1><p>Bybit USDT perpetual market scanner with explainable technical signals.</p>
 <div class="notice"><b>Order execution is disabled.</b> This dashboard only reads public market data. When access protection is enabled, you will be asked for the dashboard access token before the first scan. The token stays in this tab's session storage.</div>
-<div class="controls"><input id="symbol" value="BTCUSDT" aria-label="Symbol" maxlength="30"><select id="interval" aria-label="Timeframe"><option value="1">1 minute</option><option value="5" selected>5 minutes</option><option value="15">15 minutes</option><option value="60">1 hour</option><option value="240">4 hours</option></select><button class="primary" id="scan">Scan market</button><button id="scanTop">Scan top futures</button><button id="start">Start monitoring</button><button id="stop" disabled>Stop monitoring</button><button id="clearToken">Clear access token</button></div>
+<div class="controls"><input id="symbol" value="BTCUSDT" aria-label="Symbol" maxlength="30"><select id="interval" aria-label="Timeframe"><option value="1">1 minute</option><option value="5" selected>5 minutes</option><option value="15">15 minutes</option><option value="60">1 hour</option><option value="240">4 hours</option></select><button class="primary" id="scan">Scan market</button><button id="connectBybit">Verify Bybit account</button><button id="scanTop">Scan top futures</button><button id="start">Start monitoring</button><button id="stop" disabled>Stop monitoring</button><button id="clearToken">Clear access token</button></div>
 <div class="grid">
 <section class="card"><div class="label">SIGNAL</div><div class="value" id="signal">—</div><p id="reason">Run a scan to see the technical setup.</p></section>
 <section class="card"><div class="label">LAST CLOSED CANDLE</div><div class="value" id="price">—</div><p id="market">Symbol: BTCUSDT</p></section>
-<section class="card"><div class="label">RISK STATUS</div><div class="value">SAFE MODE</div><p>No orders are submitted. No exchange secrets are stored in the browser.</p></section>
+<section class="card"><div class="label">BYBIT ACCOUNT</div><div class="value" id="accountStatus">Not checked</div><p id="accountMessage">Verify server-side API credentials. Keys are never entered in this page.</p></section><section class="card"><div class="label">RISK STATUS</div><div class="value">SAFE MODE</div><p>No orders are submitted. No exchange secrets are stored in the browser.</p></section>
 </div>
 <section class="card"><div class="row" style="justify-content:space-between"><b>Technical breakdown</b><span class="pill" id="updated">Not scanned yet</span></div><pre id="details">EMA20 / EMA50 / EMA200 · RSI14 · MACD histogram</pre></section>
 <section class="card" style="margin-top:14px"><div class="row" style="justify-content:space-between"><b>Liquid USDT futures shortlist</b><span class="pill" id="topStatus">Not scanned</span></div><pre id="topResults">Use “Scan top futures” to rank liquid contracts by technical signal.</pre></section>
@@ -44,6 +44,17 @@ async function apiFetch(url){
   }
   throw new Error('Authentication failed.');
 }
+async function verifyBybitAccount(){
+  const button=$('connectBybit');button.disabled=true;$('accountStatus').textContent='Checking…';$('accountMessage').textContent='Checking private API authentication; no orders will be placed.';
+  try{
+    const data=await apiFetch('/api/bybit/account-connection');
+    $('accountStatus').textContent=data.connected?'Connected':'Not connected';
+    $('accountMessage').textContent=data.message+' Environment: '+data.environment+'. Trading enabled: '+data.trading_enabled+'.';
+  }catch(e){
+    $('accountStatus').textContent='Check failed';
+    $('accountMessage').textContent=e.message;
+  }finally{button.disabled=false}
+}
 async function scan(){
   if(busy)return;busy=true;$('scan').disabled=true;
   try{
@@ -67,7 +78,7 @@ async function scanTop(){
   }catch(e){$('topStatus').textContent='Scan error';$('topResults').textContent=e.message}
   finally{topBusy=false;$('scanTop').disabled=false}
 }
-$('scanTop').addEventListener('click',scanTop);$('scan').addEventListener('click',scan);
+$('scanTop').addEventListener('click',scanTop);$('scan').addEventListener('click',scan);$('connectBybit').addEventListener('click',verifyBybitAccount);
 $('start').addEventListener('click',()=>{if(timer)return;scan();timer=setInterval(scan,15000);$('start').disabled=true;$('stop').disabled=false;$('updated').textContent='Monitoring every 15s'});
 $('stop').addEventListener('click',()=>{if(timer)clearInterval(timer);timer=null;$('start').disabled=false;$('stop').disabled=true;$('updated').textContent='Monitoring stopped'});
 $('clearToken').addEventListener('click',()=>{sessionStorage.removeItem('bybitAgentToken');alert('Access token cleared from this tab.')});
