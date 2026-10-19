@@ -27,7 +27,7 @@ client = HTTP(
 # but configure REQUIRE_ACCESS_TOKEN=true on any public host.
 @app.middleware("http")
 async def protect_public_endpoints(request: Request, call_next):
-    if request.url.path == "/health":
+    if request.url.path in {"/health", "/"}:
         return await call_next(request)
 
     require_token = os.getenv("REQUIRE_ACCESS_TOKEN", "false").lower() == "true"
