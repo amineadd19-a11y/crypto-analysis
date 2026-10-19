@@ -23,27 +23,35 @@ client = HTTP(
     retry_delay=1,
 )
 
-# Public deployments can require a bearer token. Keep local development convenient,
-# but configure REQUIRE_ACCESS_TOKEN=true on any public host.
-@app.middleware("http")
-async def protect_public_endpoints(request: Request, call_next):
-    if request.url.path in {"/health", "/"}:
-        return await call_next(request)
-
-    require_token = os.getenv("REQUIRE_ACCESS_TOKEN", "false").lower() == "true"
-    expected_token = os.getenv("AGENT_ACCESS_TOKEN", "").strip()
+def access_denial(path: str, authorization: str, require_token: bool, expected_token: str):
+    """Return an HTTP denial response when a protected request is unauthorized."""
+    if path in {"/health", "/"}:
+        return None
+    expected_token = expected_token.strip()
     if require_token and not expected_token:
         return JSONResponse(
             status_code=503,
             content={"detail": "Service access protection is not configured."},
         )
-    if expected_token:
-        supplied = request.headers.get("authorization", "")
-        expected_header = f"Bearer {expected_token}"
-        if not hmac.compare_digest(supplied, expected_header):
-            return JSONResponse(status_code=401, content={"detail": "Authentication required."})
-    elif require_token:
-        return JSONResponse(status_code=503, content={"detail": "Access token is not configured."})
+    if expected_token and not hmac.compare_digest(authorization, f"Bearer {expected_token}"):
+        return JSONResponse(status_code=401, content={"detail": "Authentication required."})
+    return None
+
+
+# Public deployments can require a bearer token. Keep local development convenient,
+# but configure REQUIRE_ACCESS_TOKEN=true on any public host.
+@app.middleware("http")
+async def protect_public_endpoints(request: Request, call_next):
+    require_token = os.getenv("REQUIRE_ACCESS_TOKEN", "false").lower() == "true"
+    expected_token = os.getenv("AGENT_ACCESS_TOKEN", "")
+    denial = access_denial(
+        request.url.path,
+        request.headers.get("authorization", ""),
+        require_token,
+        expected_token,
+    )
+    if denial is not None:
+        return denial
     return await call_next(request)
 
 ALLOWED_INTERVALS = {"1", "3", "5", "15", "30", "60", "120", "240", "360", "720", "D", "W", "M"}
