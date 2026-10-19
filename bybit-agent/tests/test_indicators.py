@@ -22,6 +22,18 @@ class IndicatorTests(unittest.TestCase):
         with self.assertRaises(Exception):
             build_signal([10.0] * 100)
 
+    def test_signal_rejects_non_finite_close(self):
+        for bad in (float("nan"), float("inf"), float("-inf")):
+            with self.subTest(value=bad):
+                with self.assertRaises(Exception):
+                    build_signal([10.0] * 199 + [bad])
+
+    def test_signal_rejects_zero_or_negative_close(self):
+        for bad in (0.0, -1.0):
+            with self.subTest(value=bad):
+                with self.assertRaises(Exception):
+                    build_signal([10.0] * 199 + [bad])
+
 
 if __name__ == "__main__":
     unittest.main()
