@@ -131,7 +131,11 @@ def scan(
         if response.get("retCode") != 0:
             raise HTTPException(status_code=502, detail="Bybit rejected the market data request.")
         candles = response.get("result", {}).get("list", [])
-        # Bybit returns newest-first; use chronological order for indicator calculations.
+        # Bybit returns newest-first; the first candle may still be forming.
+        # Exclude it to avoid signals changing before the candle closes.
+        if len(candles) > 1:
+            candles = candles[1:]
+        # Indicators require chronological order.
         candles = list(reversed(candles))
         closes = [float(candle[4]) for candle in candles]
         if not closes or any(not math.isfinite(value) or value <= 0 for value in closes):
