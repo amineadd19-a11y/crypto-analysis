@@ -60,6 +60,8 @@ def macd_histogram(values: list[float]) -> float:
 def build_signal(closes: list[float]) -> dict:
     if len(closes) < 200:
         raise HTTPException(status_code=422, detail="Not enough candles; request at least 200 for EMA200.")
+    if any(not math.isfinite(value) or value <= 0 for value in closes):
+        raise HTTPException(status_code=422, detail="Close prices must be positive finite numbers.")
     e20, e50, e200 = ema(closes, 20), ema(closes, 50), ema(closes, 200)
     last = closes[-1]
     current_rsi = rsi(closes)
