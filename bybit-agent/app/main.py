@@ -14,7 +14,13 @@ app = FastAPI(
 )
 
 # Public market data only. Trading routes are intentionally not implemented.
-client = HTTP(testnet=os.getenv("BYBIT_TESTNET", "false").lower() == "true")
+client = HTTP(
+    testnet=os.getenv("BYBIT_TESTNET", "false").lower() == "true",
+    timeout=10,
+    force_retry=True,
+    max_retries=2,
+    retry_delay=1,
+)
 ALLOWED_INTERVALS = {"1", "3", "5", "15", "30", "60", "120", "240", "360", "720", "D", "W", "M"}
 
 
