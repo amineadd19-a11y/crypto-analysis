@@ -20,7 +20,7 @@ h1{font-size:clamp(26px,5vw,42px);margin:28px 0 8px}p{color:var(--muted);line-he
 <section class="card"><div class="label">RISK STATUS</div><div class="value">SAFE MODE</div><p>No order execution. No API secrets in browser.</p></section>
 </div>
 <section class="card"><div class="row" style="justify-content:space-between"><b>Technical breakdown</b><span class="pill" id="updated">Not scanned yet</span></div><pre id="details">EMA20 / EMA50 / EMA200 · RSI14 · MACD histogram</pre></section>
-<footer>Signals are heuristic, not financial advice or a promise of profit. Candles can include the currently forming candle. Always validate execution and risk settings before enabling real trading.</footer>
+<footer>Signals are heuristic, not financial advice or a promise of profit. Signals use closed candles only. Always validate execution and risk settings before enabling real trading.</footer>
 </main>
 <script>
 const $=id=>document.getElementById(id);let timer=null,busy=false;
