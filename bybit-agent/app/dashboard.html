@@ -6,25 +6,69 @@
 <style>
 :root{color-scheme:dark;--bg:#080d18;--panel:#111a2b;--line:#25334a;--muted:#9aabc3;--text:#eef4ff;--green:#36d399;--red:#fb7185;--blue:#7aa7ff}
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#14243d,var(--bg) 55%);color:var(--text);font:15px system-ui,-apple-system,Segoe UI,sans-serif}
-main{max-width:1100px;margin:auto;padding:24px 16px 50px}.top{display:flex;justify-content:space-between;gap:16px;align-items:center;flex-wrap:wrap}.brand{font-weight:800;font-size:24px;letter-spacing:.2px}.brand span{color:var(--blue)}.pill{border:1px solid var(--line);padding:8px 12px;border-radius:99px;color:var(--muted);font-size:12px}
-h1{font-size:clamp(26px,5vw,42px);margin:28px 0 8px}p{color:var(--muted);line-height:1.55}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:22px 0}.card{background:linear-gradient(145deg,#131f33,#0d1524);border:1px solid var(--line);border-radius:16px;padding:18px;min-width:0}.label{font-size:12px;color:var(--muted)}.value{font-size:25px;font-weight:750;margin-top:9px;overflow-wrap:anywhere}.muted{color:var(--muted)}.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.controls{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0}button,select,input{font:inherit;border-radius:10px;border:1px solid var(--line);padding:11px 13px;background:#0b1321;color:var(--text)}button{cursor:pointer;font-weight:700}button.primary{background:var(--blue);color:#07101e;border-color:var(--blue)}button:disabled{opacity:.45;cursor:not-allowed}.notice{border:1px solid #735c2b;background:#2b2415;color:#f8d98a;border-radius:12px;padding:13px 15px;line-height:1.5}.status{font-weight:700}.long{color:var(--green)}.short{color:var(--red)}pre{white-space:pre-wrap;overflow-wrap:anywhere;color:#c6d4e8;background:#09111e;border:1px solid var(--line);border-radius:12px;padding:14px;min-height:110px}footer{color:var(--muted);font-size:12px;margin-top:22px}@media(max-width:680px){.grid{grid-template-columns:1fr}.value{font-size:22px}main{padding:16px 12px}}
+main{max-width:1100px;margin:auto;padding:24px 16px 50px}.top{display:flex;justify-content:space-between;gap:16px;align-items:center;flex-wrap:wrap}.brand{font-weight:800;font-size:24px}.brand span{color:var(--blue)}.pill{border:1px solid var(--line);padding:8px 12px;border-radius:99px;color:var(--muted);font-size:12px}
+h1{font-size:clamp(26px,5vw,42px);margin:28px 0 8px}p{color:var(--muted);line-height:1.55}.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin:22px 0}.card{background:linear-gradient(145deg,#131f33,#0d1524);border:1px solid var(--line);border-radius:16px;padding:18px;min-width:0}.label{font-size:12px;color:var(--muted)}.value{font-size:25px;font-weight:750;margin-top:9px;overflow-wrap:anywhere}.muted{color:var(--muted)}.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.controls{display:flex;gap:10px;flex-wrap:wrap;margin:18px 0}button,select,input{font:inherit;border-radius:10px;border:1px solid var(--line);padding:11px 13px;background:#0b1321;color:var(--text)}button{cursor:pointer;font-weight:700}button.primary{background:var(--blue);color:#07101e;border-color:var(--blue)}button:disabled{opacity:.45;cursor:not-allowed}.notice{border:1px solid #735c2b;background:#2b2415;color:#f8d98a;border-radius:12px;padding:13px 15px;line-height:1.5}.long{color:var(--green)}.short{color:var(--red)}pre{white-space:pre-wrap;overflow-wrap:anywhere;color:#c6d4e8;background:#09111e;border:1px solid var(--line);border-radius:12px;padding:14px;min-height:100px}footer{color:var(--muted);font-size:12px;margin-top:22px}@media(max-width:680px){.grid{grid-template-columns:1fr}.value{font-size:22px}main{padding:16px 12px}}
 </style></head>
 <body><main>
-<header class="top"><div class="brand">BYBIT <span>AI TRADER</span></div><div class="pill">PRIVATE AGENT • LIVE MARKET DATA</div></header>
-<h1>Trading Intelligence</h1><p>Independent control panel for market scanning and explainable signals.</p>
-<div class="notice"><b>Execution is currently disabled.</b> This dashboard reads public Bybit market data and scans signals only. It will not place orders until authenticated execution, risk controls, and explicit live-trading configuration are implemented and verified.</div>
-<div class="controls"><input id="symbol" value="BTCUSDT" aria-label="Symbol" maxlength="30"><select id="interval" aria-label="Timeframe"><option value="1">1 minute</option><option value="5" selected>5 minutes</option><option value="15">15 minutes</option><option value="60">1 hour</option><option value="240">4 hours</option></select><button class="primary" id="scan">Scan market</button><button id="scanTop">Scan top futures</button><button id="start">Start monitoring</button><button id="stop" disabled>Stop monitoring</button></div>
+<header class="top"><div class="brand">BYBIT <span>AI TRADER</span></div><div class="pill">MARKET ANALYSIS • SAFE MODE</div></header>
+<h1>Trading Intelligence</h1><p>Bybit USDT perpetual market scanner with explainable technical signals.</p>
+<div class="notice"><b>Order execution is disabled.</b> This dashboard only reads public market data. When access protection is enabled, you will be asked for the dashboard access token before the first scan. The token stays in this tab's session storage.</div>
+<div class="controls"><input id="symbol" value="BTCUSDT" aria-label="Symbol" maxlength="30"><select id="interval" aria-label="Timeframe"><option value="1">1 minute</option><option value="5" selected>5 minutes</option><option value="15">15 minutes</option><option value="60">1 hour</option><option value="240">4 hours</option></select><button class="primary" id="scan">Scan market</button><button id="scanTop">Scan top futures</button><button id="start">Start monitoring</button><button id="stop" disabled>Stop monitoring</button><button id="clearToken">Clear access token</button></div>
 <div class="grid">
 <section class="card"><div class="label">SIGNAL</div><div class="value" id="signal">—</div><p id="reason">Run a scan to see the technical setup.</p></section>
-<section class="card"><div class="label">LAST CLOSED / LATEST CLOSE</div><div class="value" id="price">—</div><p id="market">Symbol: BTCUSDT</p></section>
-<section class="card"><div class="label">RISK STATUS</div><div class="value">SAFE MODE</div><p>No order execution. No API secrets in browser.</p></section>
+<section class="card"><div class="label">LAST CLOSED CANDLE</div><div class="value" id="price">—</div><p id="market">Symbol: BTCUSDT</p></section>
+<section class="card"><div class="label">RISK STATUS</div><div class="value">SAFE MODE</div><p>No orders are submitted. No exchange secrets are stored in the browser.</p></section>
 </div>
 <section class="card"><div class="row" style="justify-content:space-between"><b>Technical breakdown</b><span class="pill" id="updated">Not scanned yet</span></div><pre id="details">EMA20 / EMA50 / EMA200 · RSI14 · MACD histogram</pre></section>
-<section class="card" style="margin-top:14px"><div class="row" style="justify-content:space-between"><b>Liquid USDT futures shortlist</b><span class="pill" id="topStatus">Not scanned</span></div><pre id="topResults">Use “Scan top futures” to rank liquid contracts by technical signal.</pre></section><footer>Signals are heuristic, not financial advice or a promise of profit. Signals use closed candles only. Always validate execution and risk settings before enabling real trading.</footer>
+<section class="card" style="margin-top:14px"><div class="row" style="justify-content:space-between"><b>Liquid USDT futures shortlist</b><span class="pill" id="topStatus">Not scanned</span></div><pre id="topResults">Use “Scan top futures” to rank liquid contracts by technical signal.</pre></section>
+<footer>Signals are heuristic, not financial advice or a promise of profit. Monitoring runs only while this browser tab remains open.</footer>
 </main>
 <script>
-const $=id=>document.getElementById(id);let timer=null,busy=false;
-async function scan(){if(busy)return;busy=true;$('scan').disabled=true;try{const symbol=$('symbol').value.trim().toUpperCase();const interval=$('interval').value;const res=await fetch('/api/scan?symbol='+encodeURIComponent(symbol)+'&interval='+encodeURIComponent(interval)+'&limit=200');const data=await res.json();if(!res.ok)throw Error(data.detail||'Scan failed');const a=data.analysis;$('signal').textContent=a.signal;$('signal').className='value '+(a.signal==='LONG'?'long':a.signal==='SHORT'?'short':'');$('reason').textContent=a.reasons.join(' · ');$('price').textContent=Number(a.last_close).toPrecision(8);$('market').textContent=data.symbol+' · '+data.interval+'m · '+data.candles_used+' candles';$('details').textContent='EMA20: '+a.ema20+'\nEMA50: '+a.ema50+'\nEMA200: '+a.ema200+'\nRSI14: '+a.rsi14+'\nMACD histogram: '+a.macd_histogram+'\n\n'+a.reasons.join('\n')+'\n\nExecution: '+a.execution;$('updated').textContent='Updated '+new Date().toLocaleTimeString()}catch(e){$('details').textContent='Error: '+e.message}finally{busy=false;$('scan').disabled=false}}
-async function scanTop(){const btn=$('scanTop');btn.disabled=true;$('topStatus').textContent='Scanning…';try{const interval=$('interval').value;const res=await fetch('/api/scan/top?interval='+encodeURIComponent(interval)+'&top_n=10&min_turnover=5000000');const data=await res.json();if(!res.ok)throw Error(data.detail||'Scan failed');$('topStatus').textContent='Scanned '+data.scanned+' contracts';$('topResults').textContent=data.results.length?data.results.map(r=>r.symbol+' | '+r.signal+' | 24h '+r.change24h_pct+'% | RSI '+r.rsi14+' | turnover {if(timer)return;scan();timer=setInterval(scan,15000);$('start').disabled=true;$('stop').disabled=false;$('updated').textContent='Monitoring every 15s'});$('stop').addEventListener('click',()=>{if(timer)clearInterval(timer);timer=null;$('start').disabled=false;$('stop').disabled=true;$('updated').textContent='Monitoring stopped'});
-</script></body></html>+Math.round(r.turnover24h).toLocaleString()+'\\n'+r.reasons.join('; ')).join('\\n\\n'):'No eligible contracts returned. Try a lower liquidity threshold.'}catch(e){$('topStatus').textContent='Scan error';$('topResults').textContent=e.message}finally{btn.disabled=false}}\n$('scanTop').addEventListener('click',scanTop);$('scan').addEventListener('click',scan);$('start').addEventListener('click',()=>{if(timer)return;scan();timer=setInterval(scan,15000);$('start').disabled=true;$('stop').disabled=false;$('updated').textContent='Monitoring every 15s'});$('stop').addEventListener('click',()=>{if(timer)clearInterval(timer);timer=null;$('start').disabled=false;$('stop').disabled=true;$('updated').textContent='Monitoring stopped'});
+const $=id=>document.getElementById(id);
+let timer=null,busy=false,topBusy=false;
+function getToken(){return sessionStorage.getItem('bybitAgentToken')||''}
+async function apiFetch(url){
+  let token=getToken();
+  for(let attempt=0;attempt<2;attempt++){
+    const headers={};
+    if(token) headers.Authorization='Bearer '+token;
+    const response=await fetch(url,{headers});
+    if(response.status===401&&attempt===0){
+      const entered=window.prompt('Enter the dashboard access token. It will be kept only in this tab.');
+      if(!entered) throw new Error('Access token required.');
+      token=entered.trim();sessionStorage.setItem('bybitAgentToken',token);continue;
+    }
+    const data=await response.json().catch(()=>({detail:'Invalid server response'}));
+    if(!response.ok) throw new Error(data.detail||('Request failed ('+response.status+')'));
+    return data;
+  }
+  throw new Error('Authentication failed.');
+}
+async function scan(){
+  if(busy)return;busy=true;$('scan').disabled=true;
+  try{
+    const symbol=$('symbol').value.trim().toUpperCase(),interval=$('interval').value;
+    const data=await apiFetch('/api/scan?symbol='+encodeURIComponent(symbol)+'&interval='+encodeURIComponent(interval)+'&limit=200');
+    const a=data.analysis;
+    $('signal').textContent=a.signal;$('signal').className='value '+(a.signal==='LONG'?'long':a.signal==='SHORT'?'short':'');
+    $('reason').textContent=a.reasons.join(' · ');$('price').textContent=Number(a.last_close).toPrecision(8);
+    $('market').textContent=data.symbol+' · '+data.interval+'m · '+data.candles_used+' candles';
+    $('details').textContent='EMA20: '+a.ema20+'\nEMA50: '+a.ema50+'\nEMA200: '+a.ema200+'\nRSI14: '+a.rsi14+'\nMACD histogram: '+a.macd_histogram+'\n\n'+a.reasons.join('\n')+'\n\nExecution: '+a.execution;
+    $('updated').textContent='Updated '+new Date().toLocaleTimeString();
+  }catch(e){$('details').textContent='Error: '+e.message}
+  finally{busy=false;$('scan').disabled=false}
+}
+async function scanTop(){
+  if(topBusy)return;topBusy=true;$('scanTop').disabled=true;$('topStatus').textContent='Scanning…';
+  try{
+    const data=await apiFetch('/api/scan/top?interval='+encodeURIComponent($('interval').value)+'&top_n=10&min_turnover=5000000');
+    $('topStatus').textContent='Scanned '+data.scanned+' contracts';
+    $('topResults').textContent=data.results.length?data.results.map(r=>r.symbol+' | '+r.signal+' | 24h '+r.change24h_pct+'% | RSI '+r.rsi14+' | turnover '+Math.round(r.turnover24h).toLocaleString()+'\n'+r.reasons.join('; ')).join('\n\n'):'No eligible contracts returned.';
+  }catch(e){$('topStatus').textContent='Scan error';$('topResults').textContent=e.message}
+  finally{topBusy=false;$('scanTop').disabled=false}
+}
+$('scanTop').addEventListener('click',scanTop);$('scan').addEventListener('click',scan);
+$('start').addEventListener('click',()=>{if(timer)return;scan();timer=setInterval(scan,15000);$('start').disabled=true;$('stop').disabled=false;$('updated').textContent='Monitoring every 15s'});
+$('stop').addEventListener('click',()=>{if(timer)clearInterval(timer);timer=null;$('start').disabled=false;$('stop').disabled=true;$('updated').textContent='Monitoring stopped'});
+$('clearToken').addEventListener('click',()=>{sessionStorage.removeItem('bybitAgentToken');alert('Access token cleared from this tab.')});
 </script></body></html>
