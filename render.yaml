@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: bybit-ai-agent-demo
+    runtime: docker
+    plan: free
+    region: frankfurt
+    branch: feat/bybit-ai-agent-demo
+    rootDir: bybit-agent
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: BYBIT_TESTNET
+        value: "true"
+      - key: TRADING_ENABLED
+        value: "false"
