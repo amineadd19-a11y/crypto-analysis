@@ -1,68 +1,25 @@
-import os
 import unittest
-from unittest.mock import patch
 
-from fastapi import Request
-from fastapi.responses import JSONResponse
-
-from app.main import protect_public_endpoints
+from app.main import access_denial
 
 
-def make_request(path="/", authorization=""):
-    scope = {
-        "type": "http",
-        "asgi": {"version": "3.0", "spec_version": "2.3"},
-        "http_version": "1.1",
-        "method": "GET",
-        "scheme": "http",
-        "path": path,
-        "raw_path": path.encode(),
-        "query_string": b"",
-        "root_path": "",
-        "headers": [(b"authorization", authorization.encode())] if authorization else [],
-        "client": ("testclient", 123),
-        "server": ("testserver", 80),
-    }
-    return Request(scope)
+class AccessProtectionTests(unittest.TestCase):
+    def test_rejects_missing_or_wrong_bearer_token(self):
+        self.assertEqual(access_denial("/api/scan", "", True, "long-test-secret").status_code, 401)
+        self.assertEqual(access_denial("/api/scan", "Bearer wrong", True, "long-test-secret").status_code, 401)
 
+    def test_accepts_correct_bearer_token(self):
+        self.assertIsNone(access_denial("/api/scan", "Bearer long-test-secret", True, "long-test-secret"))
 
-class AccessProtectionTests(unittest.IsolatedAsyncioTestCase):
-    async def test_rejects_missing_or_wrong_bearer_token(self):
-        async def call_next(_request):
-            return JSONResponse({"ok": True})
+    def test_fails_closed_if_token_required_but_missing(self):
+        self.assertEqual(access_denial("/api/scan", "", True, "").status_code, 503)
 
-        with patch.dict(os.environ, {"REQUIRE_ACCESS_TOKEN": "true", "AGENT_ACCESS_TOKEN": "long-test-secret"}):
-            response = await protect_public_endpoints(make_request("/api/scan"), call_next)
-        self.assertEqual(response.status_code, 401)
+    def test_health_and_dashboard_shell_remain_public(self):
+        self.assertIsNone(access_denial("/health", "", True, "long-test-secret"))
+        self.assertIsNone(access_denial("/", "", True, "long-test-secret"))
 
-        with patch.dict(os.environ, {"REQUIRE_ACCESS_TOKEN": "true", "AGENT_ACCESS_TOKEN": "long-test-secret"}):
-            response = await protect_public_endpoints(make_request("/api/scan", "Bearer wrong"), call_next)
-        self.assertEqual(response.status_code, 401)
-
-    async def test_accepts_correct_bearer_token(self):
-        async def call_next(_request):
-            return JSONResponse({"ok": True})
-
-        with patch.dict(os.environ, {"REQUIRE_ACCESS_TOKEN": "true", "AGENT_ACCESS_TOKEN": "long-test-secret"}):
-            response = await protect_public_endpoints(make_request("/api/scan", "Bearer long-test-secret"), call_next)
-        self.assertEqual(response.status_code, 200)
-
-    async def test_fails_closed_if_token_required_but_missing(self):
-        async def call_next(_request):
-            return JSONResponse({"ok": True})
-
-        with patch.dict(os.environ, {"REQUIRE_ACCESS_TOKEN": "true", "AGENT_ACCESS_TOKEN": ""}):
-            response = await protect_public_endpoints(make_request("/api/scan"), call_next)
-        self.assertEqual(response.status_code, 503)
-
-    async def test_health_and_dashboard_shell_remain_public(self):
-        async def call_next(_request):
-            return JSONResponse({"status": "ok"})
-
-        with patch.dict(os.environ, {"REQUIRE_ACCESS_TOKEN": "true", "AGENT_ACCESS_TOKEN": "long-test-secret"}):
-            for path in ("/health", "/"):
-                response = await protect_public_endpoints(make_request(path), call_next)
-                self.assertEqual(response.status_code, 200, path)
+    def test_optional_token_still_protects_when_configured(self):
+        self.assertEqual(access_denial("/api/scan", "", False, "configured-secret").status_code, 401)
 
 
 if __name__ == "__main__":
