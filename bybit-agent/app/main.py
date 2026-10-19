@@ -1,14 +1,16 @@
 import math
 import os
+from pathlib import Path
 from typing import Literal
 
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.responses import FileResponse
 from pybit.unified_trading import HTTP
 
 app = FastAPI(
     title="Bybit AI Trader",
     version="0.1.0",
-    description="Demo-first, analysis-only scanner for Bybit USDT perpetual markets.",
+    description="Independent analysis-only scanner for Bybit USDT perpetual markets.",
 )
 
 # Public market data only. Trading routes are intentionally not implemented.
@@ -86,6 +88,11 @@ def build_signal(closes: list[float]) -> dict:
         "reasons": reasons,
         "execution": "DISABLED",
     }
+
+
+@app.get("/", include_in_schema=False)
+def dashboard() -> FileResponse:
+    return FileResponse(Path(__file__).with_name("dashboard.html"))
 
 
 @app.get("/health")
