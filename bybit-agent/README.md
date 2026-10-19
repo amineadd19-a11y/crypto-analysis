@@ -28,6 +28,8 @@ Open `/health`, then try `/api/scan?symbol=BTCUSDT&interval=5&limit=200`.
 
 Copy `.env.example` to `.env` if needed. The market scanner uses public endpoints and needs no credentials. Never commit API keys or secrets.
 
-## Deployment
+## Deployment status
 
-Deploy this directory as a Railway service using the included Dockerfile. Keep trading disabled until demo execution and risk-control tests have passed.
+This agent is currently a GitHub feature branch, not a publicly hosted service. The included Dockerfile is configured for a container host that supports a repository subdirectory build context. A Render deployment attempt was blocked because the connected Render account requires billing information; no service was created. Railway is also unavailable in the connected account because its trial has expired.
+
+Before exposing the dashboard publicly, add access protection and request throttling. Keep `TRADING_ENABLED=false`: the current service has no order-submission endpoints and is analysis-only. Do not add API credentials until a separately reviewed demo-execution phase is implemented.
