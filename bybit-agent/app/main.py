@@ -56,8 +56,8 @@ def macd_histogram(values: list[float]) -> float:
 
 
 def build_signal(closes: list[float]) -> dict:
-    if len(closes) < 60:
-        raise HTTPException(status_code=422, detail="Not enough candles; request at least 60.")
+    if len(closes) < 200:
+        raise HTTPException(status_code=422, detail="Not enough candles; request at least 200 for EMA200.")
     e20, e50, e200 = ema(closes, 20), ema(closes, 50), ema(closes, 200)
     last = closes[-1]
     current_rsi = rsi(closes)
@@ -110,7 +110,7 @@ def tickers(category: str = Query(default="linear", pattern="^(linear|spot)$")) 
 def scan(
     symbol: str = Query(default="BTCUSDT", min_length=3, max_length=30, pattern="^[A-Z0-9]+$"),
     interval: str = Query(default="5"),
-    limit: int = Query(default=200, ge=60, le=1000),
+    limit: int = Query(default=200, ge=200, le=1000),
 ) -> dict:
     if interval not in ALLOWED_INTERVALS:
         raise HTTPException(status_code=400, detail="Unsupported interval.")
