@@ -16,11 +16,10 @@ from pybit.unified_trading import HTTP
 
 app = FastAPI(
     title="Bybit AI Trader",
-    version="0.2.1",
+    version="0.2.2",
     description="Independent analysis-only scanner for Bybit USDT perpetual markets.",
 )
 
-# Residual pybit client (private account checks only). Public market reads use app.market_data.
 client = HTTP(
     testnet=os.getenv("BYBIT_TESTNET", "false").lower() == "true",
     timeout=8,
@@ -30,17 +29,13 @@ client = HTTP(
 )
 
 def access_denial(path: str, authorization: str, require_token: bool, expected_token: str):
-    """Return an HTTP denial response when a protected request is unauthorized."""
     if path in {"/health", "/"}:
         return None
     expected_token = expected_token.strip()
     if not require_token:
         return None
     if not expected_token:
-        return JSONResponse(
-            status_code=503,
-            content={"detail": "Service access protection is not configured."},
-        )
+        return JSONResponse(status_code=503, content={"detail": "Service access protection is not configured."})
     if not hmac.compare_digest(authorization, f"Bearer {expected_token}"):
         return JSONResponse(status_code=401, content={"detail": "Authentication required."})
     return None
@@ -50,12 +45,7 @@ def access_denial(path: str, authorization: str, require_token: bool, expected_t
 async def protect_public_endpoints(request: Request, call_next):
     require_token = os.getenv("REQUIRE_ACCESS_TOKEN", "false").lower() == "true"
     expected_token = os.getenv("AGENT_ACCESS_TOKEN", "")
-    denial = access_denial(
-        request.url.path,
-        request.headers.get("authorization", ""),
-        require_token,
-        expected_token,
-    )
+    denial = access_denial(request.url.path, request.headers.get("authorization", ""), require_token, expected_token)
     if denial is not None:
         return denial
     return await call_next(request)
@@ -111,8 +101,6 @@ def build_signal(closes: list[float]) -> dict:
     last = closes[-1]
     current_rsi = rsi(closes)
     hist = macd_histogram(closes)
-    reasons: list[str] = []
-
     if last > e20[-1] > e50[-1] and current_rsi >= 50 and hist > 0:
         direction: Literal["LONG", "SHORT", "WAIT"] = "LONG"
         reasons = ["Close above EMA20 and EMA50", "EMA20 above EMA50", "RSI supports upward momentum", "MACD histogram positive"]
@@ -122,18 +110,7 @@ def build_signal(closes: list[float]) -> dict:
     else:
         direction = "WAIT"
         reasons = ["Trend/momentum filters do not align; no trade signal"]
-
-    return {
-        "signal": direction,
-        "last_close": last,
-        "ema20": e20[-1],
-        "ema50": e50[-1],
-        "ema200": e200[-1],
-        "rsi14": round(current_rsi, 2),
-        "macd_histogram": hist,
-        "reasons": reasons,
-        "execution": "DISABLED",
-    }
+    return {"signal": direction, "last_close": last, "ema20": e20[-1], "ema50": e50[-1], "ema200": e200[-1], "rsi14": round(current_rsi, 2), "macd_histogram": hist, "reasons": reasons, "execution": "DISABLED"}
 
 
 @app.get("/", include_in_schema=False)
@@ -144,16 +121,8 @@ def dashboard() -> FileResponse:
 @app.get("/health")
 def health() -> dict:
     from app.market_data import probe_market_connectivity
-
     market = probe_market_connectivity(timeout=4.0)
-    return {
-        "status": "ok",
-        "service": "bybit-ai-trader",
-        "version": "0.2.1",
-        "trading_enabled": False,
-        "oauth": "pkce-s256",
-        "market_data": market,
-    }
+    return {"status": "ok", "service": "bybit-ai-trader", "version": "0.2.2", "trading_enabled": False, "oauth": "pkce-s256", "market_data": market}
 
 
 @app.get("/api/bybit/account-connection")
@@ -161,33 +130,17 @@ def bybit_account_connection() -> dict:
     api_key = os.getenv("BYBIT_API_KEY", "").strip()
     api_secret = os.getenv("BYBIT_API_SECRET", "").strip()
     if not api_key or not api_secret:
-        raise HTTPException(
-            status_code=503,
-            detail="Bybit account connection is not configured. Add BYBIT_API_KEY and BYBIT_API_SECRET as server-side environment variables.",
-        )
+        raise HTTPException(status_code=503, detail="Bybit account connection is not configured. Add BYBIT_API_KEY and BYBIT_API_SECRET as server-side environment variables.")
     try:
-        private_client = HTTP(
-            testnet=os.getenv("BYBIT_TESTNET", "false").lower() == "true",
-            api_key=api_key,
-            api_secret=api_secret,
-            timeout=10,
-            force_retry=False,
-        )
+        private_client = HTTP(testnet=os.getenv("BYBIT_TESTNET", "false").lower() == "true", api_key=api_key, api_secret=api_secret, timeout=10, force_retry=False)
         response = private_client.get_wallet_balance(accountType="UNIFIED")
         if response.get("retCode") != 0:
-            raise HTTPException(status_code=502, detail="Bybit rejected the private API connection. Check key permissions and testnet/mainnet selection.")
-        return {
-            "connected": True,
-            "environment": "testnet" if os.getenv("BYBIT_TESTNET", "false").lower() == "true" else "mainnet",
-            "account_type": "UNIFIED",
-            "trading_enabled": False,
-            "orders_placed": False,
-            "message": "Private Bybit API authentication succeeded. This endpoint is read-only and does not place orders.",
-        }
+            raise HTTPException(status_code=502, detail="Bybit rejected the private API connection.")
+        return {"connected": True, "environment": "testnet" if os.getenv("BYBIT_TESTNET", "false").lower() == "true" else "mainnet", "account_type": "UNIFIED", "trading_enabled": False, "orders_placed": False, "message": "Private Bybit API authentication succeeded. Read-only."}
     except HTTPException:
         raise
     except Exception:
-        raise HTTPException(status_code=502, detail="Unable to authenticate with Bybit. Check API key permissions, IP restrictions, and environment selection.")
+        raise HTTPException(status_code=502, detail="Unable to authenticate with Bybit.")
 
 
 from app.oauth_flow import OAuthExchangeRequest, OAuthStartRequest, exchange_code, start_oauth
@@ -225,27 +178,15 @@ def _bybit_oauth_get(access_token: str, environment: str, path: str, params: dic
                     last_error = exc
                     continue
                 raise
-        raise HTTPException(
-            status_code=401,
-            detail="Bybit rejected this OAuth access token on MAINNET/TESTNET/UNIFY-TEST-3. Token verify failed usually means the token is expired, incomplete, or not an OAuth access token (do not paste an API key). Click Start Bybit authorization and paste a fresh access token or auth code.",
-        ) from last_error
-
-    hosts = {
-        "mainnet": "https://api2.bybit.com",
-        "testnet": "https://api2-testnet.bybit.com",
-        "unify-test-3": "https://api2.unify-test-3.bybit.com",
-    }
+        raise HTTPException(status_code=401, detail="Bybit rejected this OAuth access token on MAINNET/TESTNET/UNIFY-TEST-3. Token verify failed usually means the token is expired, incomplete, or not an OAuth access token.") from last_error
+    hosts = {"mainnet": "https://api2.bybit.com", "testnet": "https://api2-testnet.bybit.com", "unify-test-3": "https://api2.unify-test-3.bybit.com"}
     host = hosts.get(environment)
     if not host:
         raise HTTPException(status_code=400, detail="Unsupported Bybit OAuth environment.")
     url = host + path
     if params:
         url += "?" + urlencode(params)
-    request = URLRequest(url, headers={
-        "Authorization": f"Bearer {access_token.strip()}",
-        "Accept": "application/json",
-        "User-Agent": "Bybit-AI-Trader/0.2",
-    })
+    request = URLRequest(url, headers={"Authorization": f"Bearer {access_token.strip()}", "Accept": "application/json", "User-Agent": "Bybit-AI-Trader/0.2"})
     try:
         with urlopen(request, timeout=12) as response:
             payload = json.loads(response.read().decode("utf-8"))
@@ -265,7 +206,6 @@ def _bybit_oauth_get(access_token: str, environment: str, path: str, params: dic
         detail = f"Bybit OAuth rejected the request (code {code})."
         if provider_message:
             detail += f" Provider message: {provider_message}"
-        detail += " Check that the selected MAINNET/TESTNET environment matches where you authorized."
         raise HTTPException(status_code=502, detail=detail)
     payload["_resolved_environment"] = environment
     return payload
@@ -283,10 +223,7 @@ def _oauth_result_accounts(payload: dict) -> list[dict]:
         member_id = item.get("sub_member_id") or item.get("subMemberId") or item.get("member_id")
         if member_id is None:
             continue
-        accounts.append({
-            "sub_member_id": str(member_id),
-            "name": str(item.get("sub_member_name") or item.get("name") or item.get("nickname") or f"AI Subaccount {member_id}"),
-        })
+        accounts.append({"sub_member_id": str(member_id), "name": str(item.get("sub_member_name") or item.get("name") or item.get("nickname") or f"AI Subaccount {member_id}")})
     return accounts
 
 
@@ -295,54 +232,28 @@ def bybit_oauth_accounts(body: OAuthAccountsRequest) -> dict:
     payload = _bybit_oauth_get(body.access_token, body.environment, "/oauth/v1/resource/restrict/ai_accounts")
     accounts = _oauth_result_accounts(payload)
     resolved_environment = payload.get("_resolved_environment", body.environment)
-    return {
-        "environment": resolved_environment,
-        "accounts": accounts,
-        "count": len(accounts),
-        "can_create": len(accounts) < 5,
-        "storage": "browser-session-only",
-    }
+    return {"environment": resolved_environment, "accounts": accounts, "count": len(accounts), "can_create": len(accounts) < 5, "storage": "browser-session-only"}
 
 
 @app.post("/api/bybit/oauth/verify")
 def bybit_oauth_verify(body: OAuthSelectRequest) -> dict:
-    payload = _bybit_oauth_get(
-        body.access_token, body.environment,
-        "/oauth/v1/resource/restrict/ai_accounts",
-        {"sub_member_id": body.sub_member_id},
-    )
+    payload = _bybit_oauth_get(body.access_token, body.environment, "/oauth/v1/resource/restrict/ai_accounts", {"sub_member_id": body.sub_member_id})
     resolved_environment = payload.get("_resolved_environment", body.environment)
     result = payload.get("result", [])
     account = result[0] if isinstance(result, list) and result else result if isinstance(result, dict) else None
     if not isinstance(account, dict) or not account.get("api_key") or not account.get("api_secret"):
         raise HTTPException(status_code=502, detail="Bybit did not return credentials for the selected AI subaccount.")
     try:
-        private_client = HTTP(
-            testnet=resolved_environment == "testnet",
-            api_key=str(account["api_key"]),
-            api_secret=str(account["api_secret"]),
-            timeout=10,
-            force_retry=False,
-        )
+        private_client = HTTP(testnet=resolved_environment == "testnet", api_key=str(account["api_key"]), api_secret=str(account["api_secret"]), timeout=10, force_retry=False)
         response = private_client.get_wallet_balance(accountType="UNIFIED")
         if response.get("retCode") != 0:
             raise HTTPException(status_code=502, detail="Bybit returned credentials, but private account verification failed.")
     except HTTPException:
         raise
     except Exception:
-        raise HTTPException(status_code=502, detail="Private Bybit verification failed. Check the selected AI subaccount and permissions.")
+        raise HTTPException(status_code=502, detail="Private Bybit verification failed.")
     key = str(account["api_key"])
-    return {
-        "connected": True,
-        "environment": resolved_environment,
-        "sub_member_id": str(account.get("sub_member_id") or body.sub_member_id),
-        "account_name": str(account.get("sub_member_name") or account.get("name") or "Bybit AI Subaccount"),
-        "api_key_masked": (key[:5] + "..." + key[-4:]) if len(key) > 9 else "***",
-        "trading_enabled": False,
-        "orders_placed": False,
-        "message": "Bybit OAuth and private account verification succeeded. No credentials were returned to the browser and no orders were placed.",
-        "storage": "browser-session-only",
-    }
+    return {"connected": True, "environment": resolved_environment, "sub_member_id": str(account.get("sub_member_id") or body.sub_member_id), "account_name": str(account.get("sub_member_name") or account.get("name") or "Bybit AI Subaccount"), "api_key_masked": (key[:5] + "..." + key[-4:]) if len(key) > 9 else "***", "trading_enabled": False, "orders_placed": False, "message": "Bybit OAuth and private account verification succeeded. No credentials returned to browser.", "storage": "browser-session-only"}
 
 
 from app.market_routes import register_market_routes
