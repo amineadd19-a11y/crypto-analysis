@@ -9,8 +9,6 @@ from app.market_data import UpstreamMarketError, get_kline, get_tickers, raise_a
 
 
 def register_market_routes(app, client, ALLOWED_INTERVALS, build_signal):
-    # `client` (pybit) is retained for compatibility; public market reads use urllib
-    # via market_data so upstream HTTP status and CloudFront blocks are visible.
     _ = client
 
     @app.get("/api/market/tickers")
@@ -21,6 +19,8 @@ def register_market_routes(app, client, ALLOWED_INTERVALS, build_signal):
                 "category": category,
                 "result": response.get("result", {}).get("list", []),
                 "upstream_host": response.get("_resolved_host"),
+                "data_source": response.get("_data_source", "unknown"),
+                "bybit_error": response.get("_bybit_error"),
             }
         except UpstreamMarketError as exc:
             raise_as_http(exc)
@@ -29,10 +29,7 @@ def register_market_routes(app, client, ALLOWED_INTERVALS, build_signal):
         except Exception:
             raise HTTPException(
                 status_code=502,
-                detail={
-                    "error": "market_data_upstream",
-                    "message": "Unable to reach Bybit market data.",
-                },
+                detail={"error": "market_data_upstream", "message": "Unable to reach market data."},
             )
 
     @app.get("/api/scan/top")
@@ -42,7 +39,6 @@ def register_market_routes(app, client, ALLOWED_INTERVALS, build_signal):
         top_n: int = Query(default=10, ge=1, le=20),
         min_turnover: float = Query(default=5_000_000, gt=0),
     ) -> dict:
-        """Scan a bounded shortlist of liquid USDT perpetuals; analysis only."""
         if interval not in ALLOWED_INTERVALS:
             raise HTTPException(status_code=400, detail="Unsupported interval.")
         try:
@@ -63,12 +59,7 @@ def register_market_routes(app, client, ALLOWED_INTERVALS, build_signal):
             results = []
             for turnover, symbol, last_price, change in eligible[:top_n]:
                 try:
-                    klines = get_kline(
-                        category="linear",
-                        symbol=symbol,
-                        interval=interval,
-                        limit=limit,
-                    )
+                    klines = get_kline(category="linear", symbol=symbol, interval=interval, limit=limit)
                     candles = klines.get("result", {}).get("list", [])
                     if len(candles) > 1:
                         candles = candles[1:]
@@ -77,36 +68,25 @@ def register_market_routes(app, client, ALLOWED_INTERVALS, build_signal):
                     if len(closes) < 200 or any(not math.isfinite(v) or v <= 0 for v in closes):
                         continue
                     analysis = build_signal(closes)
-                    results.append(
-                        {
-                            "symbol": symbol,
-                            "price": last_price,
-                            "change24h_pct": round(change, 2),
-                            "turnover24h": turnover,
-                            "signal": analysis["signal"],
-                            "rsi14": analysis["rsi14"],
-                            "ema20": analysis["ema20"],
-                            "ema50": analysis["ema50"],
-                            "reasons": analysis["reasons"],
-                        }
-                    )
+                    results.append({
+                        "symbol": symbol, "price": last_price,
+                        "change24h_pct": round(change, 2), "turnover24h": turnover,
+                        "signal": analysis["signal"], "rsi14": analysis["rsi14"],
+                        "ema20": analysis["ema20"], "ema50": analysis["ema50"],
+                        "reasons": analysis["reasons"],
+                    })
                 except UpstreamMarketError:
                     continue
                 except Exception:
                     continue
-            results.sort(
-                key=lambda row: (row["signal"] != "WAIT", row["turnover24h"]),
-                reverse=True,
-            )
+            results.sort(key=lambda row: (row["signal"] != "WAIT", row["turnover24h"]), reverse=True)
             return {
-                "category": "linear",
-                "interval": interval,
-                "scanned": len(results),
-                "requested": top_n,
-                "results": results,
-                "execution": "DISABLED",
+                "category": "linear", "interval": interval, "scanned": len(results),
+                "requested": top_n, "results": results, "execution": "DISABLED",
                 "upstream_host": response.get("_resolved_host"),
-                "disclaimer": "Shortlist uses liquidity, then technical filters. No orders are placed.",
+                "data_source": response.get("_data_source", "unknown"),
+                "bybit_error": response.get("_bybit_error"),
+                "disclaimer": "Shortlist uses liquidity, then technical filters. No orders are placed. Source may be Bybit or OKX public.",
             }
         except UpstreamMarketError as exc:
             raise_as_http(exc)
@@ -115,10 +95,7 @@ def register_market_routes(app, client, ALLOWED_INTERVALS, build_signal):
         except Exception:
             raise HTTPException(
                 status_code=502,
-                detail={
-                    "error": "market_data_upstream",
-                    "message": "Unable to scan the Bybit futures shortlist.",
-                },
+                detail={"error": "market_data_upstream", "message": "Unable to scan the futures shortlist."},
             )
 
     @app.get("/api/scan")
@@ -130,41 +107,29 @@ def register_market_routes(app, client, ALLOWED_INTERVALS, build_signal):
         if interval not in ALLOWED_INTERVALS:
             raise HTTPException(status_code=400, detail="Unsupported interval.")
         try:
-            response = get_kline(
-                category="linear",
-                symbol=symbol,
-                interval=interval,
-                limit=limit,
-            )
+            response = get_kline(category="linear", symbol=symbol, interval=interval, limit=limit)
             candles = response.get("result", {}).get("list", [])
             if len(candles) > 1:
                 candles = candles[1:]
             candles = list(reversed(candles))
             closes = [float(candle[4]) for candle in candles]
             if not closes or any(not math.isfinite(value) or value <= 0 for value in closes):
-                raise HTTPException(status_code=502, detail="Invalid candle data from Bybit.")
+                raise HTTPException(status_code=502, detail="Invalid candle data from upstream.")
             analysis = build_signal(closes)
             return {
-                "symbol": symbol,
-                "category": "linear",
-                "interval": interval,
-                "candles_used": len(closes),
-                "analysis": analysis,
+                "symbol": symbol, "category": "linear", "interval": interval,
+                "candles_used": len(closes), "analysis": analysis,
                 "upstream_host": response.get("_resolved_host"),
-                "disclaimer": (
-                    "Heuristic signal only. No orders are placed; "
-                    "validate with backtests and demo trading."
-                ),
+                "data_source": response.get("_data_source", "unknown"),
+                "bybit_error": response.get("_bybit_error"),
+                "disclaimer": "Heuristic signal only. No orders are placed. data_source is Bybit or OKX public fallback.",
             }
-        except UpstreamMarketError as exp:
-            raise_as_http(exp)
+        except UpstreamMarketError as exc:
+            raise_as_http(exc)
         except HTTPException:
             raise
         except Exception:
             raise HTTPException(
                 status_code=502,
-                detail={
-                    "error": "market_data_upstream",
-                    "message": "Unable to scan this symbol. Check the symbol and retry.",
-                },
+                detail={"error": "market_data_upstream", "message": "Unable to scan this symbol."},
             )
