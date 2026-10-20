@@ -30,7 +30,7 @@ def _http_error(code: int, body: bytes, url: str = "https://api.bybit.com/v5/mar
 
 
 class MarketDataClientTests(unittest.TestCase):
-    @patch("app.market_data.urlopen")
+    @patch("app.market_data_core.urlopen")
     def test_successful_bybit_tickers(self, mock_urlopen):
         mock_urlopen.return_value = _FakeResponse(
             {"retCode": 0, "result": {"list": [{"symbol": "BTCUSDT", "lastPrice": "100.0"}]}}
@@ -39,7 +39,7 @@ class MarketDataClientTests(unittest.TestCase):
         self.assertEqual(payload["retCode"], 0)
         self.assertEqual(payload["_data_source"], "bybit")
 
-    @patch("app.market_data.urlopen")
+    @patch("app.market_data_core.urlopen")
     def test_cloudfront_falls_back_to_okx(self, mock_urlopen):
         body = b"The Amazon CloudFront distribution is configured to block access from your country"
         mock_urlopen.side_effect = [
@@ -51,7 +51,7 @@ class MarketDataClientTests(unittest.TestCase):
         self.assertEqual(payload["_bybit_error"], "cloudfront_block")
         self.assertEqual(payload["result"]["list"][0]["symbol"], "BTCUSDT")
 
-    @patch("app.market_data.urlopen")
+    @patch("app.market_data_core.urlopen")
     def test_okx_kline_fallback(self, mock_urlopen):
         body = b"CloudFront block access from your country"
         mock_urlopen.side_effect = [
@@ -61,7 +61,7 @@ class MarketDataClientTests(unittest.TestCase):
         payload = market_data.get_kline("linear", "BTCUSDT", "5", 200)
         self.assertEqual(payload["_data_source"], "okx-public")
 
-    @patch("app.market_data.urlopen")
+    @patch("app.market_data_core.urlopen")
     def test_probe_reports_okx_when_bybit_blocked(self, mock_urlopen):
         body = b"The Amazon CloudFront distribution is configured to block access from your country"
 
@@ -76,7 +76,7 @@ class MarketDataClientTests(unittest.TestCase):
         self.assertEqual(result["status"], "ok")
         self.assertEqual(result["active_source"], "okx-public")
 
-    @patch("app.market_data.urlopen")
+    @patch("app.market_data_core.urlopen")
     def test_raise_as_http_cloudfront_is_503(self, mock_urlopen):
         body = b"CloudFront block access from your country"
         mock_urlopen.side_effect = _http_error(403, body)
@@ -85,6 +85,30 @@ class MarketDataClientTests(unittest.TestCase):
         with self.assertRaises(HTTPException) as http:
             market_data.raise_as_http(upstream.exception)
         self.assertEqual(http.exception.status_code, 503)
+
+    @patch("app.market_data_core.urlopen")
+    def test_timeout_then_alternate_bybit_host(self, mock_urlopen):
+        mock_urlopen.side_effect = [TimeoutError(), _FakeResponse({"retCode": 0, "result": {"list": []}})]
+        payload = market_data.bybit_market_get("/v5/market/tickers", {"category": "linear"})
+        self.assertEqual(payload["retCode"], 0)
+        self.assertEqual(mock_urlopen.call_count, 2)
+
+    @patch("app.market_data_core.urlopen")
+    def test_http_5xx_maps_to_upstream_error(self, mock_urlopen):
+        mock_urlopen.side_effect = _http_error(502, b"Bad Gateway")
+        with self.assertRaises(market_data.UpstreamMarketError) as caught:
+            market_data.bybit_market_get("/v5/market/kline", {"symbol": "BTCUSDT"})
+        self.assertEqual(caught.exception.kind, "http_error")
+
+    @patch("app.market_data_core.urlopen")
+    def test_network_error_on_bybit_tries_okx(self, mock_urlopen):
+        mock_urlopen.side_effect = [
+            URLError("Name or service not known"),
+            URLError("Name or service not known"),
+            _FakeResponse({"code": "0", "data": [{"instId": "ETH-USDT-SWAP", "last": "3000", "open24h": "2900", "volCcy24h": "500"}]}),
+        ]
+        payload = market_data.get_tickers(category="linear")
+        self.assertEqual(payload["_data_source"], "okx-public")
 
 
 if __name__ == "__main__":
