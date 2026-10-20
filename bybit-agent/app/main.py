@@ -220,7 +220,13 @@ def _bybit_oauth_get(access_token: str, environment: str, path: str, params: dic
             raise HTTPException(status_code=401, detail="Bybit OAuth token expired or is invalid. Authorize again.")
         if str(code) == "20039":
             raise HTTPException(status_code=400, detail="Bind two-factor authentication (2FA) on Bybit, then retry.")
-        raise HTTPException(status_code=502, detail="Bybit OAuth request failed. Check authorization and try again.")
+        provider_message = payload.get("retMsg", payload.get("ret_msg", ""))
+        provider_message = str(provider_message).strip()[:180]
+        detail = f"Bybit OAuth rejected the request (code {code})."
+        if provider_message:
+            detail += f" Provider message: {provider_message}"
+        detail += " Check that the selected MAINNET/TESTNET environment matches where you authorized."
+        raise HTTPException(status_code=502, detail=detail)
     return payload
 
 
