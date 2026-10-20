@@ -20,7 +20,7 @@ h1{font-size:clamp(26px,5vw,42px);margin:28px 0 8px}p{color:var(--muted);line-he
   <p><a href="https://www.bybit.com/en/learn/ai-subaccount/agent-connect" target="_blank" rel="noopener noreferrer" style="color:var(--blue)">Open Bybit's official connection guide</a></p>
   <div class="controls">
     <input id="oauthToken" type="password" autocomplete="off" spellcheck="false" placeholder="Paste Bybit OAuth access token" aria-label="Bybit OAuth access token" style="flex:1;min-width:240px">
-    <select id="oauthEnvironment" aria-label="Bybit environment"><option value="mainnet" selected>MAINNET</option><option value="testnet">TESTNET</option></select>
+    <select id="oauthEnvironment" aria-label="Bybit environment"><option value="auto" selected>AUTO-DETECT</option><option value="mainnet">MAINNET</option><option value="testnet">TESTNET</option></select>
     <button class="primary" id="loadAccounts">Load AI subaccounts</button>
   </div>
   <div class="controls">
@@ -83,12 +83,13 @@ async function oauthPost(path,body){
   throw new Error('Authentication failed.');
 }
 async function loadOAuthAccounts(){
-  const button=$('loadAccounts');button.disabled=true;$('oauthStatus').textContent='Connecting to Bybit OAuth…';
+  const button=$('loadAccounts');button.disabled=true;$('oauthStatus').textContent='Checking Bybit MAINNET, then TESTNET only if Bybit reports an environment mismatch…';
   try{
     const token=oauthToken(),environment=oauthEnvironment();
     if(!token)throw new Error('Paste the Bybit OAuth access token first. Do not paste an API secret here.');
     const data=await oauthPost('/api/bybit/oauth/accounts',{access_token:token,environment});
-    sessionStorage.setItem('bybitOAuthAccessToken',token);sessionStorage.setItem('bybitOAuthEnvironment',environment);
+    sessionStorage.setItem('bybitOAuthAccessToken',token);sessionStorage.setItem('bybitOAuthEnvironment',data.environment);
+    $('oauthEnvironment').value=data.environment;
     $('oauthToken').value=token;
     const select=$('subaccountSelect');select.replaceChildren();
     const placeholder=document.createElement('option');placeholder.value='';placeholder.disabled=true;placeholder.selected=true;placeholder.textContent='Choose an AI subaccount…';select.appendChild(placeholder);
