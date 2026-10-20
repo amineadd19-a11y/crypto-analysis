@@ -1,0 +1,3 @@
+redeploy-request: 2026-10-20T13:50Z
+commit: c2a0e885
+reason: production still on 0.2.2; force Vercel Git webhook

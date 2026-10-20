@@ -1,0 +1,11 @@
+# Optional: deploy this FastAPI backend on Railway if you need Bybit-native market data
+# from a region/IP that Bybit allows. Vercel dashboard can point API_BASE at the Railway URL.
+# This file does not auto-deploy; connect the repo in the Railway dashboard yourself.
+[build]
+builder = "NIXPACKS"
+
+[deploy]
+startCommand = "uvicorn app.main:app --host 0.0.0.0 --port $PORT"
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+restartPolicyType = "ON_FAILURE"
