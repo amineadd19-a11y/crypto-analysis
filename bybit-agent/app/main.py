@@ -16,17 +16,17 @@ from pybit.unified_trading import HTTP
 
 app = FastAPI(
     title="Bybit AI Trader",
-    version="0.2.0",
+    version="0.2.1",
     description="Independent analysis-only scanner for Bybit USDT perpetual markets.",
 )
 
-# Public market data only. Trading routes are intentionally not implemented.
+# Residual pybit client (private account checks only). Public market reads use app.market_data.
 client = HTTP(
     testnet=os.getenv("BYBIT_TESTNET", "false").lower() == "true",
-    timeout=10,
-    force_retry=True,
-    max_retries=2,
-    retry_delay=1,
+    timeout=8,
+    force_retry=False,
+    max_retries=1,
+    retry_delay=0,
 )
 
 def access_denial(path: str, authorization: str, require_token: bool, expected_token: str):
@@ -46,8 +46,6 @@ def access_denial(path: str, authorization: str, require_token: bool, expected_t
     return None
 
 
-# Public deployments can require a bearer token. Keep local development convenient,
-# but configure REQUIRE_ACCESS_TOKEN=true on any public host.
 @app.middleware("http")
 async def protect_public_endpoints(request: Request, call_next):
     require_token = os.getenv("REQUIRE_ACCESS_TOKEN", "false").lower() == "true"
@@ -145,7 +143,17 @@ def dashboard() -> FileResponse:
 
 @app.get("/health")
 def health() -> dict:
-    return {"status": "ok", "service": "bybit-ai-trader", "version": "0.2.0", "trading_enabled": False, "oauth": "pkce-s256"}
+    from app.market_data import probe_market_connectivity
+
+    market = probe_market_connectivity(timeout=4.0)
+    return {
+        "status": "ok",
+        "service": "bybit-ai-trader",
+        "version": "0.2.1",
+        "trading_enabled": False,
+        "oauth": "pkce-s256",
+        "market_data": market,
+    }
 
 
 @app.get("/api/bybit/account-connection")
