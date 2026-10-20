@@ -11,6 +11,16 @@ A separate Python service for Bybit USDT perpetual market analysis, with explain
 - `TRADING_ENABLED=false` by default. No order-submission, withdrawal, or transfer endpoint is implemented.
 - Signals are heuristic, not financial advice, and must be backtested before use.
 
+## OAuth (required for AI subaccount connection)
+
+1. On the dashboard, choose MAINNET (default) or TESTNET.
+2. Click **Start Bybit authorization** — this generates the official PKCE authorize URL (`client_id=ai-agent`, `scope=ai-account`).
+3. Authorize on Bybit. On the success page, copy the **OAuth access token** (or the authorization code).
+4. If you received a **code**, paste it and click **Exchange code → token** (uses the `code_verifier` stored in this tab).
+5. Click **Load AI subaccounts**, select one, then **Verify selected account**.
+
+Pasting an API key, API secret, or an expired/incomplete token produces Bybit error `50000 Token verify failed`. Always start authorization from the dashboard button so PKCE matches.
+
 ## Run locally
 
 Python 3.11+:
@@ -31,6 +41,6 @@ Copy `.env.example` to `.env` for local development if needed. Public market sca
 
 ## Deployment status
 
-The dashboard is deployed at https://bybit-ai-agent.vercel.app from the `feat/bybit-ai-agent-demo` branch. The API is hosted on Vercel using `bybit-agent/vercel.json`. A Render deployment attempt was blocked by a billing requirement; Railway was unavailable because the connected account trial had expired.
+The dashboard is deployed at https://bybit-ai-agent.vercel.app from the `feat/bybit-ai-agent-demo` branch. The API is hosted on Vercel using `bybit-agent/vercel.json`.
 
-For public hosting, protect the deployment with Vercel Authentication or enable `REQUIRE_ACCESS_TOKEN=true` and configure a strong `AGENT_ACCESS_TOKEN`. `/health` stays public for health checks. The dashboard's Bybit OAuth access token is a different credential from this optional app-access token. Keep `TRADING_ENABLED=false`: this version has no order-submission endpoints.
+For public hosting, protect the deployment with Vercel Authentication or enable `REQUIRE_ACCESS_TOKEN=true` and configure a strong `AGENT_ACCESS_TOKEN`. `/health` stays public for health checks. Keep `TRADING_ENABLED=false`: this version has no order-submission endpoints.
