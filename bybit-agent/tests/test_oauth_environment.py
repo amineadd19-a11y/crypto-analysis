@@ -14,7 +14,7 @@ class OAuthEnvironmentDetectionTests(unittest.TestCase):
     def response(payload):
         return io.BytesIO(json.dumps(payload).encode("utf-8"))
 
-    @patch("app.main.urlopen")
+    @patch("app.oauth_accounts_core.urlopen")
     def test_auto_retries_only_on_environment_mismatch(self, mock_urlopen):
         mock_urlopen.side_effect = [
             self.response({"retCode": 50000, "retMsg": "Token verify failed"}),
@@ -30,7 +30,7 @@ class OAuthEnvironmentDetectionTests(unittest.TestCase):
         self.assertIn("https://api2.bybit.com/", mock_urlopen.call_args_list[0].args[0].full_url)
         self.assertIn("https://api2-testnet.bybit.com/", mock_urlopen.call_args_list[1].args[0].full_url)
 
-    @patch("app.main.urlopen")
+    @patch("app.oauth_accounts_core.urlopen")
     def test_auto_retries_unify_test_3_after_both_standard_hosts_reject(self, mock_urlopen):
         mock_urlopen.side_effect = [
             self.response({"retCode": 50000, "retMsg": "Token verify failed"}),
@@ -46,7 +46,7 @@ class OAuthEnvironmentDetectionTests(unittest.TestCase):
         self.assertEqual(mock_urlopen.call_count, 3)
         self.assertIn("https://api2.unify-test-3.bybit.com/", mock_urlopen.call_args_list[2].args[0].full_url)
 
-    @patch("app.main.urlopen")
+    @patch("app.oauth_accounts_core.urlopen")
     def test_auto_does_not_retry_non_environment_errors(self, mock_urlopen):
         mock_urlopen.return_value = self.response(
             {"retCode": 20039, "retMsg": "2FA required"}
@@ -61,7 +61,7 @@ class OAuthEnvironmentDetectionTests(unittest.TestCase):
         self.assertIn("2FA", caught.exception.detail)
         self.assertEqual(mock_urlopen.call_count, 1)
 
-    @patch("app.main.urlopen")
+    @patch("app.oauth_accounts_core.urlopen")
     def test_auto_detects_mainnet_without_second_request(self, mock_urlopen):
         mock_urlopen.return_value = self.response({"retCode": 0, "result": []})
 
@@ -72,7 +72,7 @@ class OAuthEnvironmentDetectionTests(unittest.TestCase):
         self.assertEqual(payload["_resolved_environment"], "mainnet")
         self.assertEqual(mock_urlopen.call_count, 1)
 
-    @patch("app.main.urlopen")
+    @patch("app.oauth_accounts_core.urlopen")
     def test_auto_all_hosts_fail_gives_clear_token_message(self, mock_urlopen):
         mock_urlopen.side_effect = [
             self.response({"retCode": 50000, "retMsg": "Token verify failed"}),
@@ -144,7 +144,7 @@ class OAuthAccountsAndCreateTests(unittest.TestCase):
     def response(payload):
         return io.BytesIO(json.dumps(payload).encode("utf-8"))
 
-    @patch("app.main.urlopen")
+    @patch("app.oauth_accounts_core.urlopen")
     def test_accounts_empty_returns_create_guidance(self, mock_urlopen):
         mock_urlopen.return_value = self.response({"retCode": 0, "result": []})
         result = main.bybit_oauth_accounts(
@@ -156,7 +156,7 @@ class OAuthAccountsAndCreateTests(unittest.TestCase):
         self.assertEqual(result["create_endpoint"], "/api/bybit/oauth/create-account")
         self.assertFalse(result["trading_enabled"])
 
-    @patch("app.main.urlopen")
+    @patch("app.oauth_accounts_core.urlopen")
     def test_accounts_parses_nickname_list(self, mock_urlopen):
         mock_urlopen.return_value = self.response({
             "retCode": 0,
@@ -173,8 +173,8 @@ class OAuthAccountsAndCreateTests(unittest.TestCase):
         self.assertEqual(result["accounts"][1]["sub_member_id"], "222")
         self.assertTrue(result["can_create"])
 
-    @patch("app.main.HTTP")
-    @patch("app.main.urlopen")
+    @patch("app.oauth_accounts_core.HTTP")
+    @patch("app.oauth_accounts_core.urlopen")
     def test_create_account_calls_is_create_true(self, mock_urlopen, mock_http):
         mock_urlopen.side_effect = [
             self.response({"retCode": 0, "result": []}),
@@ -201,7 +201,7 @@ class OAuthAccountsAndCreateTests(unittest.TestCase):
         self.assertIn("is_create=true", create_req.full_url)
         self.assertIn("/oauth/v1/resource/restrict/ai_accounts", create_req.full_url)
 
-    @patch("app.main.urlopen")
+    @patch("app.oauth_accounts_core.urlopen")
     def test_create_blocked_when_already_five(self, mock_urlopen):
         five = [{"sub_member_id": str(i), "nickname": f"A{i}"} for i in range(5)]
         mock_urlopen.return_value = self.response({"retCode": 0, "result": five})
@@ -213,7 +213,7 @@ class OAuthAccountsAndCreateTests(unittest.TestCase):
         self.assertIn("at most 5", caught.exception.detail)
         self.assertEqual(mock_urlopen.call_count, 1)
 
-    @patch("app.main.urlopen")
+    @patch("app.oauth_accounts_core.urlopen")
     def test_auto_retries_on_token_verify_fail_without_ed(self, mock_urlopen):
         """Provider often returns 'Token verify fail' without trailing 'ed'."""
         mock_urlopen.side_effect = [
