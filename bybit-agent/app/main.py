@@ -188,7 +188,7 @@ class OAuthAccountsRequest(BaseModel):
     access_token: str = Field(min_length=20, max_length=4096)
     # Auto-detect only retries the alternate official host on an explicit
     # environment-mismatch response; arbitrary failures are never retried.
-    environment: Literal["mainnet", "testnet", "auto"] = "auto"
+    environment: Literal["mainnet", "testnet", "unify-test-3", "auto"] = "auto"
 
 
 class OAuthSelectRequest(OAuthAccountsRequest):
@@ -199,7 +199,9 @@ def _bybit_oauth_get(access_token: str, environment: str, path: str, params: dic
     """Call Bybit's official AI-subaccount OAuth API without logging or exposing tokens."""
     if environment == "auto":
         last_error = None
-        for candidate in ("mainnet", "testnet"):
+        # Bybit currently documents a third OAuth host for the unify-test-3 environment.
+        # Retry it only when the provider explicitly reports a token/environment verification failure.
+        for candidate in ("mainnet", "testnet", "unify-test-3"):
             try:
                 payload = _bybit_oauth_get(access_token, candidate, path, params)
                 payload["_resolved_environment"] = candidate
@@ -214,7 +216,14 @@ def _bybit_oauth_get(access_token: str, environment: str, path: str, params: dic
             detail="Bybit rejected this OAuth token on both MAINNET and TESTNET. Authorize again through Bybit's official AI-agent flow, copy the OAuth access token from the success page, and retry.",
         ) from last_error
 
-    host = "https://api2-testnet.bybit.com" if environment == "testnet" else "https://api2.bybit.com"
+    hosts = {
+        "mainnet": "https://api2.bybit.com",
+        "testnet": "https://api2-testnet.bybit.com",
+        "unify-test-3": "https://api2.unify-test-3.bybit.com",
+    }
+    host = hosts.get(environment)
+    if not host:
+        raise HTTPException(status_code=400, detail="Unsupported Bybit OAuth environment.")
     url = host + path
     if params:
         url += "?" + urlencode(params)
