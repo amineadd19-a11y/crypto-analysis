@@ -62,14 +62,20 @@ async function apiFetch(url){
 function oauthToken(){return $('oauthToken').value.trim()||sessionStorage.getItem('bybitOAuthAccessToken')||''}
 function oauthEnvironment(){return $('oauthEnvironment').value||sessionStorage.getItem('bybitOAuthEnvironment')||'mainnet'}
 async function oauthPost(path,body){
-  let response=await fetch(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-  if(response.status===401){
-    const data=await response.json().catch(()=>({detail:'Authentication required'}));
-    throw new Error(data.detail||'Access denied. If this service requires its own access token, enter it when prompted by the scanner first.');
+  let appToken=getToken();
+  for(let attempt=0;attempt<2;attempt++){
+    const headers={'Content-Type':'application/json'};
+    if(appToken)headers.Authorization='Bearer '+appToken;
+    const response=await fetch(path,{method:'POST',headers,body:JSON.stringify(body)});
+    if(response.status===401&&attempt===0&&!appToken){
+      const entered=window.prompt('If the site administrator enabled app access protection, enter the app access token (not the Bybit OAuth token).');
+      if(entered){appToken=entered.trim();sessionStorage.setItem('bybitAgentToken',appToken);continue;}
+    }
+    const data=await response.json().catch(()=>({detail:'Invalid server response'}));
+    if(!response.ok)throw new Error(data.detail||('Request failed ('+response.status+')'));
+    return data;
   }
-  const data=await response.json().catch(()=>({detail:'Invalid server response'}));
-  if(!response.ok)throw new Error(data.detail||('Request failed ('+response.status+')'));
-  return data;
+  throw new Error('Authentication failed.');
 }
 async function loadOAuthAccounts(){
   const button=$('loadAccounts');button.disabled=true;$('oauthStatus').textContent='Connecting to Bybit OAuth…';
