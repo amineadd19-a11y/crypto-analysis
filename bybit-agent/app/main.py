@@ -1,8 +1,14 @@
 import hmac
+import json
 import math
 import os
 from pathlib import Path
 from typing import Literal
+from urllib.error import HTTPError, URLError
+from urllib.parse import urlencode
+from urllib.request import Request as URLRequest, urlopen
+
+from pydantic import BaseModel, Field
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, JSONResponse
@@ -175,6 +181,122 @@ def bybit_account_connection() -> dict:
         raise
     except Exception:
         raise HTTPException(status_code=502, detail="Unable to authenticate with Bybit. Check API key permissions, IP restrictions, and environment selection.")
+
+
+
+class OAuthAccountsRequest(BaseModel):
+    access_token: str = Field(min_length=20, max_length=4096)
+    environment: Literal["mainnet", "testnet"] = "mainnet"
+
+
+class OAuthSelectRequest(OAuthAccountsRequest):
+    sub_member_id: str = Field(min_length=1, max_length=128)
+
+
+def _bybit_oauth_get(access_token: str, environment: str, path: str, params: dict | None = None) -> dict:
+    """Call Bybit's official AI-subaccount OAuth resource API without logging or exposing tokens."""
+    host = "https://api2-testnet.bybit.com" if environment == "testnet" else "https://api2.bybit.com"
+    url = host + path
+    if params:
+        url += "?" + urlencode(params)
+    request = URLRequest(url, headers={
+        "Authorization": f"Bearer {access_token.strip()}",
+        "Accept": "application/json",
+        "User-Agent": "Bybit-AI-Trader/0.2",
+    })
+    try:
+        with urlopen(request, timeout=12) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        # Never forward raw provider responses, which may contain sensitive data.
+        if exc.code in (401, 403):
+            raise HTTPException(status_code=401, detail="Bybit OAuth token is invalid or expired. Authorize again.") from None
+        raise HTTPException(status_code=502, detail="Bybit OAuth service returned an HTTP error.") from None
+    except (URLError, TimeoutError, ValueError, json.JSONDecodeError):
+        raise HTTPException(status_code=502, detail="Could not reach Bybit OAuth. Try again.") from None
+    code = payload.get("retCode", payload.get("ret_code", 0))
+    if code not in (0, "0", None):
+        if str(code) in {"33004", "401", "10001"}:
+            raise HTTPException(status_code=401, detail="Bybit OAuth token expired or is invalid. Authorize again.")
+        if str(code) == "20039":
+            raise HTTPException(status_code=400, detail="Bind two-factor authentication (2FA) on Bybit, then retry.")
+        raise HTTPException(status_code=502, detail="Bybit OAuth request failed. Check authorization and try again.")
+    return payload
+
+
+def _oauth_result_accounts(payload: dict) -> list[dict]:
+    result = payload.get("result", [])
+    if isinstance(result, dict):
+        result = result.get("list", result.get("accounts", [result]))
+    if not isinstance(result, list):
+        return []
+    accounts = []
+    for item in result:
+        if not isinstance(item, dict):
+            continue
+        member_id = item.get("sub_member_id") or item.get("subMemberId") or item.get("member_id")
+        if member_id is None:
+            continue
+        accounts.append({
+            "sub_member_id": str(member_id),
+            "name": str(item.get("sub_member_name") or item.get("name") or item.get("nickname") or f"AI Subaccount {member_id}"),
+        })
+    return accounts
+
+
+@app.post("/api/bybit/oauth/accounts")
+def bybit_oauth_accounts(body: OAuthAccountsRequest) -> dict:
+    """List AI subaccounts for a user-provided OAuth token; never persist the token."""
+    payload = _bybit_oauth_get(body.access_token, body.environment, "/oauth/v1/resource/restrict/ai_accounts")
+    accounts = _oauth_result_accounts(payload)
+    return {
+        "environment": body.environment,
+        "accounts": accounts,
+        "count": len(accounts),
+        "can_create": len(accounts) < 5,
+        "storage": "browser-session-only",
+    }
+
+
+@app.post("/api/bybit/oauth/verify")
+def bybit_oauth_verify(body: OAuthSelectRequest) -> dict:
+    """Verify the selected AI subaccount without returning or persisting API credentials."""
+    payload = _bybit_oauth_get(
+        body.access_token, body.environment,
+        "/oauth/v1/resource/restrict/ai_accounts",
+        {"sub_member_id": body.sub_member_id},
+    )
+    result = payload.get("result", [])
+    account = result[0] if isinstance(result, list) and result else result if isinstance(result, dict) else None
+    if not isinstance(account, dict) or not account.get("api_key") or not account.get("api_secret"):
+        raise HTTPException(status_code=502, detail="Bybit did not return credentials for the selected AI subaccount.")
+    try:
+        private_client = HTTP(
+            testnet=body.environment == "testnet",
+            api_key=str(account["api_key"]),
+            api_secret=str(account["api_secret"]),
+            timeout=10,
+            force_retry=False,
+        )
+        response = private_client.get_wallet_balance(accountType="UNIFIED")
+        if response.get("retCode") != 0:
+            raise HTTPException(status_code=502, detail="Bybit returned credentials, but private account verification failed.")
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(status_code=502, detail="Private Bybit verification failed. Check the selected AI subaccount and permissions.")
+    key = str(account["api_key"])
+    return {
+        "connected": True,
+        "environment": body.environment,
+        "sub_member_id": str(account.get("sub_member_id") or body.sub_member_id),
+        "account_name": str(account.get("sub_member_name") or account.get("name") or "Bybit AI Subaccount"),
+        "api_key_masked": (key[:5] + "..." + key[-4:]) if len(key) > 9 else "***",
+        "trading_enabled": False,
+        "orders_placed": False,
+        "message": "Bybit OAuth and private account verification succeeded. No credentials were returned to the browser and no orders were placed.",
+        "storage": "browser-session-only",
+    }
 
 
 @app.get("/api/market/tickers")
