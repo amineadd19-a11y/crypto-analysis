@@ -186,7 +186,9 @@ def bybit_account_connection() -> dict:
 
 class OAuthAccountsRequest(BaseModel):
     access_token: str = Field(min_length=20, max_length=4096)
-    environment: Literal["mainnet", "testnet"] = "mainnet"
+    # Auto-detect only retries the alternate official host on an explicit
+    # environment-mismatch response; arbitrary failures are never retried.
+    environment: Literal["mainnet", "testnet", "auto"] = "auto"
 
 
 class OAuthSelectRequest(OAuthAccountsRequest):
@@ -194,7 +196,24 @@ class OAuthSelectRequest(OAuthAccountsRequest):
 
 
 def _bybit_oauth_get(access_token: str, environment: str, path: str, params: dict | None = None) -> dict:
-    """Call Bybit's official AI-subaccount OAuth resource API without logging or exposing tokens."""
+    """Call Bybit's official AI-subaccount OAuth API without logging or exposing tokens."""
+    if environment == "auto":
+        last_error = None
+        for candidate in ("mainnet", "testnet"):
+            try:
+                payload = _bybit_oauth_get(access_token, candidate, path, params)
+                payload["_resolved_environment"] = candidate
+                return payload
+            except HTTPException as exc:
+                if exc.status_code == 502 and "code 50000" in str(exc.detail) and "Token verify failed" in str(exc.detail):
+                    last_error = exc
+                    continue
+                raise
+        raise HTTPException(
+            status_code=401,
+            detail="Bybit rejected this OAuth token on both MAINNET and TESTNET. Authorize again through Bybit's official AI-agent flow, copy the OAuth access token from the success page, and retry.",
+        ) from last_error
+
     host = "https://api2-testnet.bybit.com" if environment == "testnet" else "https://api2.bybit.com"
     url = host + path
     if params:
@@ -202,13 +221,12 @@ def _bybit_oauth_get(access_token: str, environment: str, path: str, params: dic
     request = URLRequest(url, headers={
         "Authorization": f"Bearer {access_token.strip()}",
         "Accept": "application/json",
-        "User-Agent": "Bybit-AI-Trader/0.2",
+        "User-Agent": "Bybit-AI-Trader/0.3",
     })
     try:
         with urlopen(request, timeout=12) as response:
             payload = json.loads(response.read().decode("utf-8"))
     except HTTPError as exc:
-        # Never forward raw provider responses, which may contain sensitive data.
         if exc.code in (401, 403):
             raise HTTPException(status_code=401, detail="Bybit OAuth token is invalid or expired. Authorize again.") from None
         raise HTTPException(status_code=502, detail="Bybit OAuth service returned an HTTP error.") from None
@@ -220,15 +238,14 @@ def _bybit_oauth_get(access_token: str, environment: str, path: str, params: dic
             raise HTTPException(status_code=401, detail="Bybit OAuth token expired or is invalid. Authorize again.")
         if str(code) == "20039":
             raise HTTPException(status_code=400, detail="Bind two-factor authentication (2FA) on Bybit, then retry.")
-        provider_message = payload.get("retMsg", payload.get("ret_msg", ""))
-        provider_message = str(provider_message).strip()[:180]
+        provider_message = str(payload.get("retMsg", payload.get("ret_msg", ""))).strip()[:180]
         detail = f"Bybit OAuth rejected the request (code {code})."
         if provider_message:
             detail += f" Provider message: {provider_message}"
         detail += " Check that the selected MAINNET/TESTNET environment matches where you authorized."
         raise HTTPException(status_code=502, detail=detail)
+    payload["_resolved_environment"] = environment
     return payload
-
 
 def _oauth_result_accounts(payload: dict) -> list[dict]:
     result = payload.get("result", [])
@@ -255,8 +272,9 @@ def bybit_oauth_accounts(body: OAuthAccountsRequest) -> dict:
     """List AI subaccounts for a user-provided OAuth token; never persist the token."""
     payload = _bybit_oauth_get(body.access_token, body.environment, "/oauth/v1/resource/restrict/ai_accounts")
     accounts = _oauth_result_accounts(payload)
+    resolved_environment = payload.get("_resolved_environment", body.environment)
     return {
-        "environment": body.environment,
+        "environment": resolved_environment,
         "accounts": accounts,
         "count": len(accounts),
         "can_create": len(accounts) < 5,
@@ -272,13 +290,14 @@ def bybit_oauth_verify(body: OAuthSelectRequest) -> dict:
         "/oauth/v1/resource/restrict/ai_accounts",
         {"sub_member_id": body.sub_member_id},
     )
+    resolved_environment = payload.get("_resolved_environment", body.environment)
     result = payload.get("result", [])
     account = result[0] if isinstance(result, list) and result else result if isinstance(result, dict) else None
     if not isinstance(account, dict) or not account.get("api_key") or not account.get("api_secret"):
         raise HTTPException(status_code=502, detail="Bybit did not return credentials for the selected AI subaccount.")
     try:
         private_client = HTTP(
-            testnet=body.environment == "testnet",
+            testnet=resolved_environment == "testnet",
             api_key=str(account["api_key"]),
             api_secret=str(account["api_secret"]),
             timeout=10,
@@ -294,7 +313,7 @@ def bybit_oauth_verify(body: OAuthSelectRequest) -> dict:
     key = str(account["api_key"])
     return {
         "connected": True,
-        "environment": body.environment,
+        "environment": resolved_environment,
         "sub_member_id": str(account.get("sub_member_id") or body.sub_member_id),
         "account_name": str(account.get("sub_member_name") or account.get("name") or "Bybit AI Subaccount"),
         "api_key_masked": (key[:5] + "..." + key[-4:]) if len(key) > 9 else "***",
