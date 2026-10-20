@@ -18,8 +18,10 @@ class AccessProtectionTests(unittest.TestCase):
         self.assertIsNone(access_denial("/health", "", True, "long-test-secret"))
         self.assertIsNone(access_denial("/", "", True, "long-test-secret"))
 
-    def test_optional_token_still_protects_when_configured(self):
-        self.assertEqual(access_denial("/api/scan", "", False, "configured-secret").status_code, 401)
+    def test_optional_token_does_not_protect_when_require_false(self):
+        # REQUIRE_ACCESS_TOKEN=false must leave APIs open even if AGENT_ACCESS_TOKEN is set.
+        self.assertIsNone(access_denial("/api/scan", "", False, "configured-secret"))
+        self.assertIsNone(access_denial("/api/scan", "Bearer anything", False, "configured-secret"))
 
 
 if __name__ == "__main__":
