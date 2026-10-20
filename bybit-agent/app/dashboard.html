@@ -48,12 +48,14 @@ async function apiFetch(url){
     const headers={};
     if(token) headers.Authorization='Bearer '+token;
     const response=await fetch(url,{headers});
-    if(response.status===401&&attempt===0){
-      const entered=window.prompt('Enter the dashboard access token. It will be kept only in this tab.');
-      if(!entered) throw new Error('Access token required.');
-      token=entered.trim();sessionStorage.setItem('bybitAgentToken',token);continue;
-    }
     const data=await response.json().catch(()=>({detail:'Invalid server response'}));
+    if(response.status===401&&attempt===0&&data.detail==='Authentication required.'){
+      const entered=window.prompt('The dashboard access token is missing or invalid. Enter the APP access token (not the Bybit OAuth token).');
+      if(!entered) throw new Error('Dashboard access token required.');
+      token=entered.trim();
+      if(!token) throw new Error('Dashboard access token required.');
+      sessionStorage.setItem('bybitAgentToken',token);continue;
+    }
     if(!response.ok) throw new Error(data.detail||('Request failed ('+response.status+')'));
     return data;
   }
@@ -67,11 +69,14 @@ async function oauthPost(path,body){
     const headers={'Content-Type':'application/json'};
     if(appToken)headers.Authorization='Bearer '+appToken;
     const response=await fetch(path,{method:'POST',headers,body:JSON.stringify(body)});
-    if(response.status===401&&attempt===0&&!appToken){
-      const entered=window.prompt('If the site administrator enabled app access protection, enter the app access token (not the Bybit OAuth token).');
-      if(entered){appToken=entered.trim();sessionStorage.setItem('bybitAgentToken',appToken);continue;}
-    }
     const data=await response.json().catch(()=>({detail:'Invalid server response'}));
+    if(response.status===401&&attempt===0&&data.detail==='Authentication required.'){
+      const entered=window.prompt('The dashboard access token is missing or invalid. Enter the APP access token (not the Bybit OAuth token).');
+      if(!entered) throw new Error('Dashboard access token required.');
+      appToken=entered.trim();
+      if(!appToken) throw new Error('Dashboard access token required.');
+      sessionStorage.setItem('bybitAgentToken',appToken);continue;
+    }
     if(!response.ok)throw new Error(data.detail||('Request failed ('+response.status+')'));
     return data;
   }
