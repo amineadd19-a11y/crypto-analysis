@@ -70,7 +70,7 @@ def okx_get_kline(symbol: str, interval: str, limit: int, timeout: float = DEFAU
     if not bar:
         raise UpstreamMarketError(f"Unsupported interval for OKX fallback: {interval}", kind="bybit_ret")
     inst = _to_okx_inst(symbol)
-    lim = min(max(limit, 1), 300)
+    lim = min(max(limit + 10, 1), 300)  # pad: routes may drop forming candle
     params = {"instId": inst, "bar": bar, "limit": str(lim)}
     payload, host = _http_get_json(f"{OKX_HOST}/api/v5/market/candles?{urlencode(params)}", timeout=timeout)
     if str(payload.get("code", "0")) not in ("0",):
