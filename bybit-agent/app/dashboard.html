@@ -96,7 +96,7 @@ async function loadOAuthAccounts(){
     for(const account of data.accounts){
       const option=document.createElement('option');option.value=account.sub_member_id;option.textContent=account.name+' ('+account.sub_member_id+')';select.appendChild(option);
     }
-    $('oauthStatus').textContent=data.count?'Found '+data.count+' AI subaccount(s) on '+environment.toUpperCase()+'. Select one explicitly, then verify.':'No AI subaccounts were returned. Create an AI Subaccount in Bybit, then load the list again.';
+    $('oauthStatus').textContent=data.count?'Found '+data.count+' AI subaccount(s) on '+data.environment.toUpperCase()+'. Select one explicitly, then verify.':'No AI subaccounts were returned on '+data.environment.toUpperCase()+'. Create an AI Subaccount in Bybit, then load the list again.';
     if(!data.count)$('accountMessage').textContent='No AI subaccounts found. Nothing was created automatically.';
   }catch(e){$('oauthStatus').textContent='Connection failed: '+e.message}
   finally{button.disabled=false}
