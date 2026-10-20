@@ -16,18 +16,23 @@ h1{font-size:clamp(26px,5vw,42px);margin:28px 0 8px}p{color:var(--muted);line-he
 <div class="controls"><input id="symbol" value="BTCUSDT" aria-label="Symbol" maxlength="30"><select id="interval" aria-label="Timeframe"><option value="1">1 minute</option><option value="5" selected>5 minutes</option><option value="15">15 minutes</option><option value="60">1 hour</option><option value="240">4 hours</option></select><button class="primary" id="scan">Scan market</button><button id="scanTop">Scan top futures</button><button id="start">Start monitoring</button><button id="stop" disabled>Stop monitoring</button><button id="clearToken">Clear app access token</button></div>
 <section class="card" style="margin:14px 0">
   <div class="row" style="justify-content:space-between"><b>Connect Bybit AI Subaccount</b><span class="pill">OAuth · no API key setup in Vercel</span></div>
-  <p>Open Bybit's official AI Subaccount connection flow, authorize the AI agent, then paste the access token shown by Bybit here. The token stays in this browser tab's session storage and is sent only to this service over HTTPS when you request account access.</p>
-  <p><a href="https://www.bybit.com/en/learn/ai-subaccount/agent-connect" target="_blank" rel="noopener noreferrer" style="color:var(--blue)">Open Bybit's official connection guide</a></p>
+  <p>Click <b>Start Bybit authorization</b> to open the official OAuth page (PKCE). After you authorize, paste the <b>access token</b> from Bybit's success page — or paste the <b>authorization code</b> and click <b>Exchange code → token</b>. Tokens stay in this tab only; the server does not store them. Do not paste API keys.</p>
+  <p><a href="https://www.bybit.com/en/learn/ai-subaccount/agent-connect" target="_blank" rel="noopener noreferrer" style="color:var(--blue)">Official Bybit AI agent connection guide</a></p>
   <div class="controls">
-    <input id="oauthToken" type="password" autocomplete="off" spellcheck="false" placeholder="Paste Bybit OAuth access token" aria-label="Bybit OAuth access token" style="flex:1;min-width:240px">
-    <select id="oauthEnvironment" aria-label="Bybit environment"><option value="auto" selected>AUTO-DETECT</option><option value="mainnet">MAINNET</option><option value="testnet">TESTNET</option><option value="unify-test-3">UNIFY TEST 3</option></select>
+    <select id="oauthEnvironment" aria-label="Bybit environment"><option value="mainnet" selected>MAINNET</option><option value="testnet">TESTNET</option><option value="unify-test-3">UNIFY TEST 3</option><option value="auto">AUTO-DETECT (token only)</option></select>
+    <button class="primary" id="startOAuth">Start Bybit authorization</button>
+    <a id="oauthLink" href="#" target="_blank" rel="noopener noreferrer" style="display:none;color:var(--blue);align-self:center">Open authorize link</a>
+  </div>
+  <div class="controls">
+    <input id="oauthToken" type="password" autocomplete="off" spellcheck="false" placeholder="Paste OAuth access token OR authorization code" aria-label="Bybit OAuth token or code" style="flex:1;min-width:240px">
+    <button id="exchangeCode">Exchange code → token</button>
     <button class="primary" id="loadAccounts">Load AI subaccounts</button>
   </div>
   <div class="controls">
     <select id="subaccountSelect" aria-label="Choose AI subaccount" style="flex:1;min-width:220px"><option value="" selected disabled>Choose an AI subaccount…</option></select>
     <button id="connectBybit">Verify selected account</button>
   </div>
-  <p class="muted" id="oauthStatus">Not connected. No account will be selected automatically.</p>
+  <p class="muted" id="oauthStatus">Not connected. Click Start Bybit authorization first.</p>
 </section>
 <div class="grid">
 <section class="card"><div class="label">SIGNAL</div><div class="value" id="signal">—</div><p id="reason">Run a scan to see the technical setup.</p></section>
@@ -82,11 +87,42 @@ async function oauthPost(path,body){
   }
   throw new Error('Authentication failed.');
 }
+async function startOAuth(){
+  const button=$('startOAuth');button.disabled=true;$('oauthStatus').textContent='Generating official Bybit authorize URL…';
+  try{
+    let env=$('oauthEnvironment').value;if(env==='auto')env='mainnet';
+    const data=await oauthPost('/api/bybit/oauth/start',{environment:env});
+    sessionStorage.setItem('bybitOAuthCodeVerifier',data.code_verifier);
+    sessionStorage.setItem('bybitOAuthEnvironment',data.environment);
+    $('oauthEnvironment').value=data.environment;
+    const link=$('oauthLink');link.href=data.authorize_url;link.style.display='inline';link.textContent='Open Bybit authorize page';
+    window.open(data.authorize_url,'_blank','noopener,noreferrer');
+    $('oauthStatus').textContent='Authorize on Bybit, then paste the access token (or auth code) below. code_verifier is stored in this tab only.';
+  }catch(e){$('oauthStatus').textContent='Start failed: '+e.message}
+  finally{button.disabled=false}
+}
+async function exchangeCode(){
+  const button=$('exchangeCode');button.disabled=true;$('oauthStatus').textContent='Exchanging authorization code…';
+  try{
+    const code=$('oauthToken').value.trim();
+    if(!code)throw new Error('Paste the authorization code from Bybit first.');
+    let env=$('oauthEnvironment').value;if(env==='auto')env=sessionStorage.getItem('bybitOAuthEnvironment')||'mainnet';
+    const verifier=sessionStorage.getItem('bybitOAuthCodeVerifier');
+    if(!verifier)throw new Error('Missing code_verifier. Click Start Bybit authorization in this same tab first.');
+    const data=await oauthPost('/api/bybit/oauth/exchange',{code,code_verifier:verifier,environment:env});
+    $('oauthToken').value=data.access_token;
+    sessionStorage.setItem('bybitOAuthAccessToken',data.access_token);
+    sessionStorage.setItem('bybitOAuthEnvironment',data.environment);
+    $('oauthEnvironment').value=data.environment;
+    $('oauthStatus').textContent='Token exchange succeeded. You can now Load AI subaccounts. Token stays in this tab only.';
+  }catch(e){$('oauthStatus').textContent='Exchange failed: '+e.message}
+  finally{button.disabled=false}
+}
 async function loadOAuthAccounts(){
-  const button=$('loadAccounts');button.disabled=true;$('oauthStatus').textContent='Checking Bybit MAINNET, TESTNET, and UNIFY TEST 3 only when the provider reports a token/environment mismatch…';
+  const button=$('loadAccounts');button.disabled=true;$('oauthStatus').textContent='Checking Bybit hosts…';
   try{
     const token=oauthToken(),environment=oauthEnvironment();
-    if(!token)throw new Error('Paste the Bybit OAuth access token first. Do not paste an API secret here.');
+    if(!token)throw new Error('Paste the Bybit OAuth access token first (or exchange a code). Do not paste an API secret.');
     const data=await oauthPost('/api/bybit/oauth/accounts',{access_token:token,environment});
     sessionStorage.setItem('bybitOAuthAccessToken',token);sessionStorage.setItem('bybitOAuthEnvironment',data.environment);
     $('oauthEnvironment').value=data.environment;
@@ -138,8 +174,8 @@ async function scanTop(){
   }catch(e){$('topStatus').textContent='Scan error';$('topResults').textContent=e.message}
   finally{topBusy=false;$('scanTop').disabled=false}
 }
-$('scanTop').addEventListener('click',scanTop);$('scan').addEventListener('click',scan);$('connectBybit').addEventListener('click',verifyBybitAccount);$('loadAccounts').addEventListener('click',loadOAuthAccounts);
+$('scanTop').addEventListener('click',scanTop);$('scan').addEventListener('click',scan);$('connectBybit').addEventListener('click',verifyBybitAccount);$('loadAccounts').addEventListener('click',loadOAuthAccounts);$('startOAuth').addEventListener('click',startOAuth);$('exchangeCode').addEventListener('click',exchangeCode);
 $('start').addEventListener('click',()=>{if(timer)return;scan();timer=setInterval(scan,15000);$('start').disabled=true;$('stop').disabled=false;$('updated').textContent='Monitoring every 15s'});
 $('stop').addEventListener('click',()=>{if(timer)clearInterval(timer);timer=null;$('start').disabled=false;$('stop').disabled=true;$('updated').textContent='Monitoring stopped'});
-$('clearToken').addEventListener('click',()=>{sessionStorage.removeItem('bybitAgentToken');sessionStorage.removeItem('bybitOAuthAccessToken');sessionStorage.removeItem('bybitOAuthEnvironment');$('oauthToken').value='';$('subaccountSelect').replaceChildren(new Option('Choose an AI subaccount…',''));$('accountStatus').textContent='Not checked';$('accountMessage').textContent='Session credentials cleared.';$('oauthStatus').textContent='Disconnected. Session token cleared.';alert('App and Bybit OAuth tokens cleared from this tab.')});
+$('clearToken').addEventListener('click',()=>{sessionStorage.removeItem('bybitAgentToken');sessionStorage.removeItem('bybitOAuthAccessToken');sessionStorage.removeItem('bybitOAuthEnvironment');sessionStorage.removeItem('bybitOAuthCodeVerifier');$('oauthToken').value='';$('subaccountSelect').replaceChildren(new Option('Choose an AI subaccount…',''));$('accountStatus').textContent='Not checked';$('accountMessage').textContent='Session credentials cleared.';$('oauthStatus').textContent='Disconnected. Session token cleared.';$('oauthLink').style.display='none';alert('App and Bybit OAuth tokens cleared from this tab.')});
 </script></body></html>
