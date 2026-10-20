@@ -31,6 +31,6 @@ Copy `.env.example` to `.env` for local development if needed. Public market sca
 
 ## Deployment status
 
-This agent is currently a GitHub feature branch, not a publicly hosted service. The included Dockerfile is configured for a container host that supports a repository subdirectory build context. A Render deployment attempt was blocked because the connected Render account requires billing information; no service was created. Railway is also unavailable in the connected account because its trial has expired.
+The dashboard is deployed at https://bybit-ai-agent.vercel.app from the `feat/bybit-ai-agent-demo` branch. The API is hosted on Vercel using `bybit-agent/vercel.json`. A Render deployment attempt was blocked by a billing requirement; Railway was unavailable because the connected account trial had expired.
 
 For public hosting, protect the deployment with Vercel Authentication or enable `REQUIRE_ACCESS_TOKEN=true` and configure a strong `AGENT_ACCESS_TOKEN`. `/health` stays public for health checks. The dashboard's Bybit OAuth access token is a different credential from this optional app-access token. Keep `TRADING_ENABLED=false`: this version has no order-submission endpoints.
