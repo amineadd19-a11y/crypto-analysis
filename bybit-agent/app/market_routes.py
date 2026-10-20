@@ -5,19 +5,35 @@ import math
 
 from fastapi import HTTPException, Query
 
+from app.market_data import UpstreamMarketError, get_kline, get_tickers, raise_as_http
+
 
 def register_market_routes(app, client, ALLOWED_INTERVALS, build_signal):
+    # `client` (pybit) is retained for compatibility; public market reads use urllib
+    # via market_data so upstream HTTP status and CloudFront blocks are visible.
+    _ = client
+
     @app.get("/api/market/tickers")
     def tickers(category: str = Query(default="linear", pattern="^(linear|spot)$")) -> dict:
         try:
-            response = client.get_tickers(category=category)
-            if response.get("retCode") != 0:
-                raise HTTPException(status_code=502, detail="Bybit market data request failed.")
-            return {"category": category, "result": response.get("result", {}).get("list", [])}
+            response = get_tickers(category=category)
+            return {
+                "category": category,
+                "result": response.get("result", {}).get("list", []),
+                "upstream_host": response.get("_resolved_host"),
+            }
+        except UpstreamMarketError as exc:
+            raise_as_http(exc)
         except HTTPException:
             raise
         except Exception:
-            raise HTTPException(status_code=502, detail="Unable to reach Bybit market data.")
+            raise HTTPException(
+                status_code=502,
+                detail={
+                    "error": "market_data_upstream",
+                    "message": "Unable to reach Bybit market data.",
+                },
+            )
 
     @app.get("/api/scan/top")
     def scan_top(
@@ -30,12 +46,10 @@ def register_market_routes(app, client, ALLOWED_INTERVALS, build_signal):
         if interval not in ALLOWED_INTERVALS:
             raise HTTPException(status_code=400, detail="Unsupported interval.")
         try:
-            response = client.get_tickers(category="linear")
-            if response.get("retCode") != 0:
-                raise HTTPException(status_code=502, detail="Bybit ticker request failed.")
-            tickers = response.get("result", {}).get("list", [])
+            response = get_tickers(category="linear")
+            tickers_list = response.get("result", {}).get("list", [])
             eligible = []
-            for item in tickers:
+            for item in tickers_list:
                 symbol = item.get("symbol", "")
                 try:
                     turnover = float(item.get("turnover24h", 0))
@@ -49,9 +63,12 @@ def register_market_routes(app, client, ALLOWED_INTERVALS, build_signal):
             results = []
             for turnover, symbol, last_price, change in eligible[:top_n]:
                 try:
-                    klines = client.get_kline(category="linear", symbol=symbol, interval=interval, limit=limit)
-                    if klines.get("retCode") != 0:
-                        continue
+                    klines = get_kline(
+                        category="linear",
+                        symbol=symbol,
+                        interval=interval,
+                        limit=limit,
+                    )
                     candles = klines.get("result", {}).get("list", [])
                     if len(candles) > 1:
                         candles = candles[1:]
@@ -60,25 +77,49 @@ def register_market_routes(app, client, ALLOWED_INTERVALS, build_signal):
                     if len(closes) < 200 or any(not math.isfinite(v) or v <= 0 for v in closes):
                         continue
                     analysis = build_signal(closes)
-                    results.append({
-                        "symbol": symbol, "price": last_price,
-                        "change24h_pct": round(change, 2), "turnover24h": turnover,
-                        "signal": analysis["signal"], "rsi14": analysis["rsi14"],
-                        "ema20": analysis["ema20"], "ema50": analysis["ema50"],
-                        "reasons": analysis["reasons"],
-                    })
+                    results.append(
+                        {
+                            "symbol": symbol,
+                            "price": last_price,
+                            "change24h_pct": round(change, 2),
+                            "turnover24h": turnover,
+                            "signal": analysis["signal"],
+                            "rsi14": analysis["rsi14"],
+                            "ema20": analysis["ema20"],
+                            "ema50": analysis["ema50"],
+                            "reasons": analysis["reasons"],
+                        }
+                    )
+                except UpstreamMarketError:
+                    continue
                 except Exception:
                     continue
-            results.sort(key=lambda row: (row["signal"] != "WAIT", row["turnover24h"]), reverse=True)
+            results.sort(
+                key=lambda row: (row["signal"] != "WAIT", row["turnover24h"]),
+                reverse=True,
+            )
             return {
-                "category": "linear", "interval": interval, "scanned": len(results),
-                "requested": top_n, "results": results, "execution": "DISABLED",
+                "category": "linear",
+                "interval": interval,
+                "scanned": len(results),
+                "requested": top_n,
+                "results": results,
+                "execution": "DISABLED",
+                "upstream_host": response.get("_resolved_host"),
                 "disclaimer": "Shortlist uses liquidity, then technical filters. No orders are placed.",
             }
+        except UpstreamMarketError as exc:
+            raise_as_http(exc)
         except HTTPException:
             raise
         except Exception:
-            raise HTTPException(status_code=502, detail="Unable to scan the Bybit futures shortlist.")
+            raise HTTPException(
+                status_code=502,
+                detail={
+                    "error": "market_data_upstream",
+                    "message": "Unable to scan the Bybit futures shortlist.",
+                },
+            )
 
     @app.get("/api/scan")
     def scan(
@@ -89,14 +130,12 @@ def register_market_routes(app, client, ALLOWED_INTERVALS, build_signal):
         if interval not in ALLOWED_INTERVALS:
             raise HTTPException(status_code=400, detail="Unsupported interval.")
         try:
-            response = client.get_kline(
+            response = get_kline(
                 category="linear",
                 symbol=symbol,
                 interval=interval,
                 limit=limit,
             )
-            if response.get("retCode") != 0:
-                raise HTTPException(status_code=502, detail="Bybit rejected the market data request.")
             candles = response.get("result", {}).get("list", [])
             if len(candles) > 1:
                 candles = candles[1:]
@@ -111,9 +150,21 @@ def register_market_routes(app, client, ALLOWED_INTERVALS, build_signal):
                 "interval": interval,
                 "candles_used": len(closes),
                 "analysis": analysis,
-                "disclaimer": "Heuristic signal only. No orders are placed; validate with backtests and demo trading.",
+                "upstream_host": response.get("_resolved_host"),
+                "disclaimer": (
+                    "Heuristic signal only. No orders are placed; "
+                    "validate with backtests and demo trading."
+                ),
             }
+        except UpstreamMarketError as exp:
+            raise_as_http(exp)
         except HTTPException:
             raise
         except Exception:
-            raise HTTPException(status_code=502, detail="Unable to scan this symbol. Check the symbol and retry.")
+            raise HTTPException(
+                status_code=502,
+                detail={
+                    "error": "market_data_upstream",
+                    "message": "Unable to scan this symbol. Check the symbol and retry.",
+                },
+            )
