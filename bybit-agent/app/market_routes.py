@@ -35,6 +35,7 @@ def register_market_routes(app, client, ALLOWED_INTERVALS, build_signal):
         limit: int = Query(default=200, ge=200, le=500),
         top_n: int = Query(default=10, ge=1, le=20),
         min_turnover: float = Query(default=5_000_000, gt=0),
+        max_symbols: int = Query(default=100, ge=1, le=500),
     ) -> dict:
         if interval not in ALLOWED_INTERVALS:
             raise HTTPException(status_code=400, detail="Unsupported interval.")
@@ -53,8 +54,12 @@ def register_market_routes(app, client, ALLOWED_INTERVALS, build_signal):
                 if symbol.endswith("USDT") and last_price > 0 and turnover >= min_turnover:
                     eligible.append((turnover, symbol, last_price, change))
             eligible.sort(key=lambda row: row[0], reverse=True)
+            # Evaluate a broad liquidity-ranked universe, then return only the best top_n.
+            # The explicit cap keeps serverless execution bounded and reports any truncation.
+            candidate_universe = eligible[:max_symbols]
             results = []
-            for turnover, symbol, last_price, change in eligible[:top_n]:
+            failed_symbols = []
+            for turnover, symbol, last_price, change in candidate_universe:
                 try:
                     klines = get_kline(category="linear", symbol=symbol, interval=interval, limit=limit)
                     candles = klines.get("result", {}).get("list", [])
@@ -73,13 +78,21 @@ def register_market_routes(app, client, ALLOWED_INTERVALS, build_signal):
                         "reasons": analysis["reasons"],
                     })
                 except UpstreamMarketError:
+                    failed_symbols.append(symbol)
                     continue
                 except Exception:
+                    failed_symbols.append(symbol)
                     continue
             results.sort(key=lambda row: (row["signal"] != "WAIT", row["turnover24h"]), reverse=True)
+            scanned_count = len(results) + len(failed_symbols)
+            results = results[:top_n]
             return {
-                "category": "linear", "interval": interval, "scanned": len(results),
-                "requested": top_n, "results": results, "execution": "DISABLED",
+                "category": "linear", "interval": interval,
+                "universe_total": len(eligible), "candidate_limit": max_symbols,
+                "universe_truncated": len(eligible) > max_symbols,
+                "scanned": scanned_count, "successful_analyses": scanned_count - len(failed_symbols),
+                "failed_count": len(failed_symbols), "failed_symbols": failed_symbols,
+                "requested": top_n, "returned": len(results), "results": results, "execution": "DISABLED",
                 "upstream_host": response.get("_resolved_host"),
                 "data_source": response.get("_data_source", "unknown"),
                 "bybit_error": response.get("_bybit_error"),
