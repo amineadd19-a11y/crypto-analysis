@@ -175,6 +175,7 @@ def register_market_routes(app, client, ALLOWED_INTERVALS, build_signal):
         min_rel_volume: float = Query(default=1.5, ge=0),
         direction: str = Query(default="any", pattern="^(any|long|short)$"),
         limit: int = Query(default=120, ge=60, le=200),
+        max_symbols: int = Query(default=100, ge=1, le=500),
     ) -> dict:
         from app.mtf_scanner import analyze_symbol_mtf, screen_candidate_from_ticker
         try:
@@ -198,7 +199,10 @@ def register_market_routes(app, client, ALLOWED_INTERVALS, build_signal):
             results = []
             rejected = []
             scanned = 0
-            for cand in eligible[: max(top_n * 3, top_n)]:
+            # Scan a broad, liquidity-ranked universe instead of stopping after a tiny shortlist.
+            # max_symbols bounds serverless runtime; response reports whether the universe was truncated.
+            candidate_universe = eligible[:max_symbols]
+            for cand in candidate_universe:
                 symbol = cand["symbol"]
                 scanned += 1
                 try:
@@ -229,11 +233,12 @@ def register_market_routes(app, client, ALLOWED_INTERVALS, build_signal):
                 except Exception:
                     rejected.append({"symbol": symbol, "reason": "scan_error", "score": 0})
                     continue
-                if len(results) >= top_n:
-                    break
             results.sort(key=lambda r: r["score"], reverse=True)
+            results = results[:top_n]
             return {
-                "category": "linear", "scanned": scanned, "returned": len(results), "results": results,
+                "category": "linear", "universe_total": len(eligible),
+                "candidate_limit": max_symbols, "universe_truncated": len(eligible) > max_symbols,
+                "scanned": scanned, "returned": len(results), "results": results,
                 "rejected_sample": rejected[:20],
                 "filters": {"min_turnover": min_turnover, "min_score": min_score, "min_rel_volume": min_rel_volume, "direction": direction},
                 "data_source": data_source, "bybit_error": bybit_error, "execution": "DISABLED", "trading_enabled": False,
