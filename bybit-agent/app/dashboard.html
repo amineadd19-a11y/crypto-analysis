@@ -13,7 +13,7 @@ h1{font-size:clamp(26px,5vw,42px);margin:28px 0 8px}p{color:var(--muted);line-he
 <header class="top"><div class="brand">BYBIT <span>AI TRADER</span></div><div class="pill">MARKET ANALYSIS • SAFE MODE</div></header>
 <h1>Trading Intelligence</h1><p>Bybit USDT perpetual market scanner with explainable technical signals.</p>
 <div class="notice"><b>Order execution is disabled.</b> This dashboard only reads public market data. When access protection is enabled, you will be asked for the dashboard access token before the first scan. The token stays in this tab's session storage.</div>
-<div class="controls"><input id="symbol" value="BTCUSDT" aria-label="Symbol" maxlength="30"><select id="interval" aria-label="Timeframe"><option value="1">1 minute</option><option value="5" selected>5 minutes</option><option value="15">15 minutes</option><option value="60">1 hour</option><option value="240">4 hours</option></select><button class="primary" id="scan">Scan market</button><button id="scanTop">Scan top futures</button><button id="start">Start monitoring</button><button id="stop" disabled>Stop monitoring</button><button id="clearToken">Clear app access token</button></div>
+<div class="controls"><input id="symbol" value="BTCUSDT" aria-label="Symbol" maxlength="30"><select id="interval" aria-label="Timeframe"><option value="1">1 minute</option><option value="5" selected>5 minutes</option><option value="15">15 minutes</option><option value="60">1 hour</option><option value="240">4 hours</option></select><button class="primary" id="scan">Scan market</button><select id="universeSize" aria-label="Contracts to scan"><option value="100" selected>Scan 100 contracts</option><option value="250">Scan 250 contracts</option><option value="500">Scan up to 500 contracts</option></select><select id="turnoverFloor" aria-label="Minimum 24h turnover"><option value="5000000" selected>Turnover ≥ $5M</option><option value="1000000">Turnover ≥ $1M</option><option value="1">All turnover levels</option></select><button id="scanTop">Scan futures universe</button><button id="start">Start monitoring</button><button id="stop" disabled>Stop monitoring</button><button id="clearToken">Clear app access token</button></div>
 <section class="card" style="margin:14px 0">
   <div class="row" style="justify-content:space-between"><b>Connect Bybit AI Subaccount</b><span class="pill">OAuth · no API key setup in Vercel</span></div>
   <p>Click <b>Start Bybit authorization</b> to open the official OAuth page (PKCE). After you authorize, paste the <b>access token</b> from Bybit's success page — or paste the <b>authorization code</b> and click <b>Exchange code → token</b>. Tokens stay in this tab only; the server does not store them. Do not paste API keys.</p>
@@ -201,9 +201,12 @@ async function scan(){
 async function scanTop(){
   if(topBusy)return;topBusy=true;$('scanTop').disabled=true;$('topStatus').textContent='Scanning…';
   try{
-    const data=await apiFetch('/api/scan/top?interval='+encodeURIComponent($('interval').value)+'&top_n=10&min_turnover=5000000');
-    $('topStatus').textContent='Scanned '+data.scanned+' contracts';
-    $('topResults').textContent=data.results.length?data.results.map(r=>r.symbol+' | '+r.signal+' | 24h '+r.change24h_pct+'% | RSI '+r.rsi14+' | turnover '+Math.round(r.turnover24h).toLocaleString()+'\n'+r.reasons.join('; ')).join('\n\n'):'No eligible contracts returned.';
+    const maxSymbols=$('universeSize').value, minTurnover=$('turnoverFloor').value;
+    const data=await apiFetch('/api/scan/top?interval='+encodeURIComponent($('interval').value)+'&top_n=10&min_turnover='+encodeURIComponent(minTurnover)+'&max_symbols='+encodeURIComponent(maxSymbols));
+    const source=data.data_source||'unknown';
+    $('topStatus').textContent='Analyzed '+data.successful_analyses+'/'+data.universe_total+' eligible · '+source+(data.universe_truncated?' · PARTIAL UNIVERSE':'');
+    const summary='Source: '+source+' | Bybit status: '+(data.bybit_error||'OK')+'\\nEligible contracts: '+data.universe_total+' | Candidate cap: '+data.candidate_limit+' | Actually analyzed: '+data.successful_analyses+' | Failed: '+data.failed_count+'\\n'+(data.universe_truncated?'WARNING: universe truncated; not every eligible contract was scanned.\\n':'Full eligible ticker list fit within the selected cap.\\n')+'\\n';
+    $('topResults').textContent=summary+(data.results.length?data.results.map(r=>r.symbol+' | '+r.signal+' | 24h '+r.change24h_pct+'% | RSI '+r.rsi14+' | turnover '+Math.round(r.turnover24h).toLocaleString()+'\\n'+r.reasons.join('; ')).join('\\n\\n'):'No eligible contracts returned.');
   }catch(e){$('topStatus').textContent='Scan error';$('topResults').textContent=e.message}
   finally{topBusy=false;$('scanTop').disabled=false}
 }

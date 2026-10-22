@@ -5,11 +5,33 @@ import math
 
 from fastapi import HTTPException, Query
 
-from app.market_data import UpstreamMarketError, get_kline, get_tickers, raise_as_http
+from app.market_data import UpstreamMarketError, get_instruments, get_kline, get_tickers, raise_as_http
 
 
 def register_market_routes(app, client, ALLOWED_INTERVALS, build_signal):
     _ = client
+
+    @app.get("/api/market/instruments")
+    def market_instruments(category: str = Query(default="linear", pattern="^(linear|spot)$")) -> dict:
+        """List active instruments; source and universe completeness are explicit."""
+        try:
+            response = get_instruments(category=category)
+            rows = response.get("result", {}).get("list", []) or []
+            symbols = sorted({str(row.get("symbol", "")) for row in rows if row.get("symbol")})
+            return {
+                "category": category, "count": len(symbols), "symbols": symbols,
+                "data_source": response.get("_data_source", "unknown"),
+                "universe_complete": bool(response.get("_universe_complete", False)),
+                "bybit_error": response.get("_bybit_error"),
+                "note": response.get("_universe_note"),
+                "trading_enabled": False,
+            }
+        except UpstreamMarketError as exc:
+            raise_as_http(exc)
+        except HTTPException:
+            raise
+        except Exception:
+            raise HTTPException(status_code=502, detail={"error": "instrument_universe_failed", "message": "Unable to fetch the instrument universe."})
 
     @app.get("/api/market/tickers")
     def tickers(category: str = Query(default="linear", pattern="^(linear|spot)$")) -> dict:
@@ -34,7 +56,8 @@ def register_market_routes(app, client, ALLOWED_INTERVALS, build_signal):
         interval: str = Query(default="5"),
         limit: int = Query(default=200, ge=200, le=500),
         top_n: int = Query(default=10, ge=1, le=20),
-        min_turnover: float = Query(default=5_000_000, gt=0),
+        min_turnover: float = Query(default=5_000_000, ge=0),
+        max_symbols: int = Query(default=100, ge=1, le=500),
     ) -> dict:
         if interval not in ALLOWED_INTERVALS:
             raise HTTPException(status_code=400, detail="Unsupported interval.")
@@ -53,8 +76,12 @@ def register_market_routes(app, client, ALLOWED_INTERVALS, build_signal):
                 if symbol.endswith("USDT") and last_price > 0 and turnover >= min_turnover:
                     eligible.append((turnover, symbol, last_price, change))
             eligible.sort(key=lambda row: row[0], reverse=True)
+            # Evaluate a broad liquidity-ranked universe, then return only the best top_n.
+            # The explicit cap keeps serverless execution bounded and reports any truncation.
+            candidate_universe = eligible[:max_symbols]
             results = []
-            for turnover, symbol, last_price, change in eligible[:top_n]:
+            failed_symbols = []
+            for turnover, symbol, last_price, change in candidate_universe:
                 try:
                     klines = get_kline(category="linear", symbol=symbol, interval=interval, limit=limit)
                     candles = klines.get("result", {}).get("list", [])
@@ -63,6 +90,7 @@ def register_market_routes(app, client, ALLOWED_INTERVALS, build_signal):
                     candles = list(reversed(candles))
                     closes = [float(row[4]) for row in candles]
                     if len(closes) < 200 or any(not math.isfinite(v) or v <= 0 for v in closes):
+                        failed_symbols.append(symbol)
                         continue
                     analysis = build_signal(closes)
                     results.append({
@@ -73,13 +101,21 @@ def register_market_routes(app, client, ALLOWED_INTERVALS, build_signal):
                         "reasons": analysis["reasons"],
                     })
                 except UpstreamMarketError:
+                    failed_symbols.append(symbol)
                     continue
                 except Exception:
+                    failed_symbols.append(symbol)
                     continue
             results.sort(key=lambda row: (row["signal"] != "WAIT", row["turnover24h"]), reverse=True)
+            scanned_count = len(results) + len(failed_symbols)
+            results = results[:top_n]
             return {
-                "category": "linear", "interval": interval, "scanned": len(results),
-                "requested": top_n, "results": results, "execution": "DISABLED",
+                "category": "linear", "interval": interval,
+                "universe_total": len(eligible), "candidate_limit": max_symbols,
+                "universe_truncated": len(eligible) > max_symbols,
+                "scanned": scanned_count, "successful_analyses": scanned_count - len(failed_symbols),
+                "failed_count": len(failed_symbols), "failed_symbols": failed_symbols,
+                "requested": top_n, "returned": len(results), "results": results, "execution": "DISABLED",
                 "upstream_host": response.get("_resolved_host"),
                 "data_source": response.get("_data_source", "unknown"),
                 "bybit_error": response.get("_bybit_error"),
@@ -170,11 +206,12 @@ def register_market_routes(app, client, ALLOWED_INTERVALS, build_signal):
     @app.get("/api/scan/smart")
     def scan_smart(
         top_n: int = Query(default=8, ge=1, le=15),
-        min_turnover: float = Query(default=3_000_000, gt=0),
+        min_turnover: float = Query(default=3_000_000, ge=0),
         min_score: float = Query(default=55, ge=0, le=100),
         min_rel_volume: float = Query(default=1.5, ge=0),
         direction: str = Query(default="any", pattern="^(any|long|short)$"),
         limit: int = Query(default=120, ge=60, le=200),
+        max_symbols: int = Query(default=100, ge=1, le=500),
     ) -> dict:
         from app.mtf_scanner import analyze_symbol_mtf, screen_candidate_from_ticker
         try:
@@ -198,7 +235,10 @@ def register_market_routes(app, client, ALLOWED_INTERVALS, build_signal):
             results = []
             rejected = []
             scanned = 0
-            for cand in eligible[: max(top_n * 3, top_n)]:
+            # Scan a broad, liquidity-ranked universe instead of stopping after a tiny shortlist.
+            # max_symbols bounds serverless runtime; response reports whether the universe was truncated.
+            candidate_universe = eligible[:max_symbols]
+            for cand in candidate_universe:
                 symbol = cand["symbol"]
                 scanned += 1
                 try:
@@ -229,11 +269,12 @@ def register_market_routes(app, client, ALLOWED_INTERVALS, build_signal):
                 except Exception:
                     rejected.append({"symbol": symbol, "reason": "scan_error", "score": 0})
                     continue
-                if len(results) >= top_n:
-                    break
             results.sort(key=lambda r: r["score"], reverse=True)
+            results = results[:top_n]
             return {
-                "category": "linear", "scanned": scanned, "returned": len(results), "results": results,
+                "category": "linear", "universe_total": len(eligible),
+                "candidate_limit": max_symbols, "universe_truncated": len(eligible) > max_symbols,
+                "scanned": scanned, "returned": len(results), "results": results,
                 "rejected_sample": rejected[:20],
                 "filters": {"min_turnover": min_turnover, "min_score": min_score, "min_rel_volume": min_rel_volume, "direction": direction},
                 "data_source": data_source, "bybit_error": bybit_error, "execution": "DISABLED", "trading_enabled": False,

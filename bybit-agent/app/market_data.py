@@ -7,7 +7,7 @@ from typing import Any
 from app.market_data_core import UpstreamMarketError, bybit_market_get, raise_as_http
 from app.market_okx import okx_get_kline, okx_get_tickers
 
-__all__ = ["UpstreamMarketError", "bybit_market_get", "get_tickers", "get_kline", "probe_market_connectivity", "raise_as_http"]
+__all__ = ["UpstreamMarketError", "bybit_market_get", "get_tickers", "get_kline", "probe_market_connectivity", "get_instruments", "raise_as_http"]
 
 
 def get_tickers(category: str = "linear", symbol: str | None = None) -> dict:
@@ -24,6 +24,52 @@ def get_tickers(category: str = "linear", symbol: str | None = None) -> dict:
         except UpstreamMarketError:
             raise bybit_err
 
+
+
+def get_instruments(category: str = "linear") -> dict:
+    """Return the active contract universe; fall back transparently to OKX public swaps."""
+    if category not in ("linear", "spot"):
+        raise UpstreamMarketError("Unsupported instrument category.", kind="bybit_ret")
+    try:
+        params: dict[str, Any] = {"category": category, "limit": 1000}
+        rows: list[dict[str, Any]] = []
+        cursor = None
+        seen_cursors: set[str] = set()
+        while True:
+            page_params = dict(params)
+            if cursor:
+                page_params["cursor"] = cursor
+            page = bybit_market_get("/v5/market/instruments-info", page_params)
+            result = page.get("result") or {}
+            rows.extend(x for x in (result.get("list") or []) if isinstance(x, dict))
+            next_cursor = str(result.get("nextPageCursor") or "")
+            if not next_cursor or next_cursor in seen_cursors:
+                break
+            seen_cursors.add(next_cursor)
+            cursor = next_cursor
+        if category == "linear":
+            rows = [
+                row for row in rows
+                if row.get("quoteCoin") == "USDT"
+                and row.get("contractType") == "LinearPerpetual"
+                and row.get("status") == "Trading"
+            ]
+        else:
+            rows = [row for row in rows if row.get("status") == "Trading"]
+        return {
+            "category": category, "result": {"list": rows},
+            "_data_source": "bybit", "_resolved_host": page.get("_resolved_host"),
+            "_bybit_error": None, "_universe_complete": True,
+        }
+    except UpstreamMarketError as bybit_err:
+        # Do not label this as the Bybit universe: OKX lists only its own instruments.
+        fallback = okx_get_tickers(category=category)
+        fallback_rows = fallback.get("result", {}).get("list", []) or []
+        fallback["_bybit_error"] = bybit_err.kind
+        fallback["_universe_complete"] = False
+        fallback["_universe_note"] = "Bybit instrument endpoint unavailable; this is the OKX public instrument universe, not the full Bybit universe."
+        fallback["result"]["list"] = fallback_rows
+        return fallback
 
 def get_kline(category: str, symbol: str, interval: str, limit: int) -> dict:
     try:

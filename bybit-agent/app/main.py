@@ -16,7 +16,7 @@ from pybit.unified_trading import HTTP
 
 app = FastAPI(
     title="Bybit AI Trader",
-    version="0.2.4",
+    version="0.3.0",
     description="Independent analysis-only multi-timeframe scanner for USDT perpetual markets.",
 )
 
@@ -122,7 +122,7 @@ def dashboard() -> FileResponse:
 def health() -> dict:
     from app.market_data import probe_market_connectivity
     market = probe_market_connectivity(timeout=4.0)
-    return {"status": "ok", "service": "bybit-ai-trader", "version": "0.2.4", "trading_enabled": False, "oauth": "pkce-s256", "market_data": market, "scanner": "mtf-smart"}
+    return {"status": "ok", "service": "bybit-ai-trader", "version": "0.3.0", "trading_enabled": False, "oauth": "pkce-s256", "market_data": market, "scanner": "mtf-smart"}
 
 
 @app.get("/api/bybit/account-connection")
@@ -184,3 +184,7 @@ def bybit_oauth_verify(body: OAuthSelectRequest) -> dict:
 
 from app.market_routes import register_market_routes
 register_market_routes(app, client, ALLOWED_INTERVALS, build_signal)
+
+
+from app.mtf_routes import register_mtf_routes
+register_mtf_routes(app)
