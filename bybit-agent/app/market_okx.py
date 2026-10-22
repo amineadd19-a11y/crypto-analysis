@@ -79,5 +79,5 @@ def okx_get_kline(symbol: str, interval: str, limit: int, timeout: float = DEFAU
     for row in payload.get("data") or []:
         if not isinstance(row, (list, tuple)) or len(row) < 5:
             continue
-        candles.append([str(row[0]), str(row[1]), str(row[2]), str(row[3]), str(row[4])])
+        candles.append([str(row[0]), str(row[1]), str(row[2]), str(row[3]), str(row[4]), str(row[5]) if len(row) > 5 else "0"])
     return {"retCode": 0, "result": {"list": candles, "symbol": symbol, "category": "linear"}, "_resolved_host": host, "_data_source": "okx-public"}
