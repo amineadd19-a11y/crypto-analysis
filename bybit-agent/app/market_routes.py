@@ -5,11 +5,33 @@ import math
 
 from fastapi import HTTPException, Query
 
-from app.market_data import UpstreamMarketError, get_kline, get_tickers, raise_as_http
+from app.market_data import UpstreamMarketError, get_instruments, get_kline, get_tickers, raise_as_http
 
 
 def register_market_routes(app, client, ALLOWED_INTERVALS, build_signal):
     _ = client
+
+    @app.get("/api/market/instruments")
+    def market_instruments(category: str = Query(default="linear", pattern="^(linear|spot)$")) -> dict:
+        """List active instruments; source and universe completeness are explicit."""
+        try:
+            response = get_instruments(category=category)
+            rows = response.get("result", {}).get("list", []) or []
+            symbols = sorted({str(row.get("symbol", "")) for row in rows if row.get("symbol")})
+            return {
+                "category": category, "count": len(symbols), "symbols": symbols,
+                "data_source": response.get("_data_source", "unknown"),
+                "universe_complete": bool(response.get("_universe_complete", False)),
+                "bybit_error": response.get("_bybit_error"),
+                "note": response.get("_universe_note"),
+                "trading_enabled": False,
+            }
+        except UpstreamMarketError as exc:
+            raise_as_http(exc)
+        except HTTPException:
+            raise
+        except Exception:
+            raise HTTPException(status_code=502, detail={"error": "instrument_universe_failed", "message": "Unable to fetch the instrument universe."})
 
     @app.get("/api/market/tickers")
     def tickers(category: str = Query(default="linear", pattern="^(linear|spot)$")) -> dict:
@@ -34,7 +56,7 @@ def register_market_routes(app, client, ALLOWED_INTERVALS, build_signal):
         interval: str = Query(default="5"),
         limit: int = Query(default=200, ge=200, le=500),
         top_n: int = Query(default=10, ge=1, le=20),
-        min_turnover: float = Query(default=5_000_000, gt=0),
+        min_turnover: float = Query(default=5_000_000, ge=0),
         max_symbols: int = Query(default=100, ge=1, le=500),
     ) -> dict:
         if interval not in ALLOWED_INTERVALS:
@@ -68,6 +90,7 @@ def register_market_routes(app, client, ALLOWED_INTERVALS, build_signal):
                     candles = list(reversed(candles))
                     closes = [float(row[4]) for row in candles]
                     if len(closes) < 200 or any(not math.isfinite(v) or v <= 0 for v in closes):
+                        failed_symbols.append(symbol)
                         continue
                     analysis = build_signal(closes)
                     results.append({
@@ -183,7 +206,7 @@ def register_market_routes(app, client, ALLOWED_INTERVALS, build_signal):
     @app.get("/api/scan/smart")
     def scan_smart(
         top_n: int = Query(default=8, ge=1, le=15),
-        min_turnover: float = Query(default=3_000_000, gt=0),
+        min_turnover: float = Query(default=3_000_000, ge=0),
         min_score: float = Query(default=55, ge=0, le=100),
         min_rel_volume: float = Query(default=1.5, ge=0),
         direction: str = Query(default="any", pattern="^(any|long|short)$"),
