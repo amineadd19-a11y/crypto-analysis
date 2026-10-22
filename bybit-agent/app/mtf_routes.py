@@ -9,7 +9,7 @@ from app.mtf_scanner import MTF_INTERVALS, analyze_symbol_mtf
 
 def _load_symbol(symbol: str, limit: int) -> dict:
     candles_by_interval: dict[str, list] = {}
-    sources: set[str] = set()
+    source_by_interval: dict[str, str] = {}
     warnings: list[str] = []
     for interval in MTF_INTERVALS:
         try:
@@ -20,15 +20,17 @@ def _load_symbol(symbol: str, limit: int) -> dict:
         if not rows:
             raise HTTPException(status_code=502, detail={"error": "empty_market_data", "symbol": symbol, "interval": interval})
         candles_by_interval[interval] = rows
-        sources.add(str(payload.get("_data_source", "unknown")))
+        source_by_interval[interval] = str(payload.get("_data_source", "unknown"))
         if payload.get("_bybit_error"):
             warnings.append(f"{interval}: Bybit primary unavailable ({payload['_bybit_error']}); using fallback.")
-    source = next(iter(sources)) if len(sources) == 1 else ("mixed" if sources else "unknown")
+    unique_sources = set(source_by_interval.values())
+    source = next(iter(unique_sources)) if len(unique_sources) == 1 else "mixed"
     result = analyze_symbol_mtf(symbol, candles_by_interval, data_source=source)
     result["market_data_warning"] = sorted(set(warnings))
     result["source_by_timeframe"] = {
-        interval: source for interval, source in zip(MTF_INTERVALS, [str((getattr(payload, "_data_source", None) or source)) for payload in []])
-    } if False else {label: source for label in result.get("timeframes", {})}
+        {"1": "1m", "5": "5m", "15": "15m", "60": "1h", "240": "4h"}[interval]: source_by_interval[interval]
+        for interval in MTF_INTERVALS
+    }
     result["execution"] = "DISABLED"
     result["trading_enabled"] = False
     return result
