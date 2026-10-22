@@ -184,3 +184,7 @@ def bybit_oauth_verify(body: OAuthSelectRequest) -> dict:
 
 from app.market_routes import register_market_routes
 register_market_routes(app, client, ALLOWED_INTERVALS, build_signal)
+
+
+from app.mtf_routes import register_mtf_routes
+register_mtf_routes(app)
