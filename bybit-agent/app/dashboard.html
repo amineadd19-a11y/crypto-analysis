@@ -13,7 +13,7 @@ h1{font-size:clamp(26px,5vw,42px);margin:28px 0 8px}p{color:var(--muted);line-he
 <header class="top"><div class="brand">BYBIT <span>AI TRADER</span></div><div class="pill">MARKET ANALYSIS • SAFE MODE</div></header>
 <h1>Trading Intelligence</h1><p>Bybit USDT perpetual market scanner with explainable technical signals.</p>
 <div class="notice"><b>Order execution is disabled.</b> This dashboard only reads public market data. When access protection is enabled, you will be asked for the dashboard access token before the first scan. The token stays in this tab's session storage.</div>
-<div class="controls"><input id="symbol" value="BTCUSDT" aria-label="Symbol" maxlength="30"><select id="interval" aria-label="Timeframe"><option value="1">1 minute</option><option value="5" selected>5 minutes</option><option value="15">15 minutes</option><option value="60">1 hour</option><option value="240">4 hours</option></select><button class="primary" id="scan">Scan market</button><button id="scanTop">Scan top futures</button><button id="start">Start monitoring</button><button id="stop" disabled>Stop monitoring</button><button id="clearToken">Clear app access token</button></div>
+<div class="controls"><input id="symbol" value="BTCUSDT" aria-label="Symbol" maxlength="30"><select id="interval" aria-label="Timeframe"><option value="1">1 minute</option><option value="5" selected>5 minutes</option><option value="15">15 minutes</option><option value="60">1 hour</option><option value="240">4 hours</option></select><button class="primary" id="scan">Scan market</button><button id="scanLevels">Scan MTF + TP/SL</button><button id="scanTop">Scan top futures</button><button id="start">Start monitoring</button><button id="stop" disabled>Stop monitoring</button><button id="clearToken">Clear app access token</button></div>
 <section class="card" style="margin:14px 0">
   <div class="row" style="justify-content:space-between"><b>Connect Bybit AI Subaccount</b><span class="pill">OAuth · no API key setup in Vercel</span></div>
   <p>Click <b>Start Bybit authorization</b> to open the official OAuth page (PKCE). After you authorize, paste the <b>access token</b> from Bybit's success page — or paste the <b>authorization code</b> and click <b>Exchange code → token</b>. Tokens stay in this tab only; the server does not store them. Do not paste API keys.</p>
@@ -198,6 +198,48 @@ async function scan(){
   }catch(e){$('details').textContent='Error: '+e.message}
   finally{busy=false;$('scan').disabled=false}
 }
+async function scanLevels(){
+  const button=$('scanLevels');button.disabled=true;
+  $('updated').textContent='Calculating multi-timeframe risk levels…';
+  try{
+    const symbol=$('symbol').value.trim().toUpperCase();
+    if(!/^[A-Z0-9]{3,30}$/.test(symbol))throw new Error('Enter a valid USDT perpetual symbol, e.g. BTCUSDT.');
+    const data=await apiFetch('/api/scan/mtf?symbol='+encodeURIComponent(symbol)+'&limit=200');
+    const agg=data.aggregate||{},levels=data.levels||{};
+    const direction=String(agg.direction||'none').toUpperCase();
+    $('signal').textContent=direction==='NONE'?'WAIT':direction;
+    $('signal').className='value '+(direction==='LONG'?'long':direction==='SHORT'?'short':'');
+    $('price').textContent=levels.reference_price!=null?Number(levels.reference_price).toPrecision(10):'—';
+    $('market').textContent=symbol+' · MTF '+(data.data_source||'unknown')+' · score '+(agg.score??'—')+'/100';
+    const lines=[
+      'MULTI-TIMEFRAME ANALYSIS',
+      'Direction: '+direction+' | Classification: '+(agg.classification||'—'),
+      'Score: '+(agg.score??'—')+'/100 | Confidence: '+(agg.confidence||'—'),
+      'Timeframe alignment: '+JSON.stringify(agg.timeframe_alignment||{}),
+      '',
+      'ENTRY ZONE: '+(levels.available&&Array.isArray(levels.entry_zone)?levels.entry_zone.map(v=>Number(v).toPrecision(10)).join(' – '):'Unavailable'),
+      'STOP LOSS (SL): '+(levels.available&&levels.stop_loss!=null?Number(levels.stop_loss).toPrecision(10):'Unavailable'),
+      'TAKE PROFIT 1 (TP1): '+(levels.available&&levels.take_profit?.[0]!=null?Number(levels.take_profit[0]).toPrecision(10):'Unavailable'),
+      'TAKE PROFIT 2 (TP2): '+(levels.available&&levels.take_profit?.[1]!=null?Number(levels.take_profit[1]).toPrecision(10):'Unavailable'),
+      'TAKE PROFIT 3 (TP3): '+(levels.available&&levels.take_profit?.[2]!=null?Number(levels.take_profit[2]).toPrecision(10):'Unavailable'),
+      'RISK/REWARD to TP1: '+(levels.risk_reward_first_target??'—'),
+      'INVALIDATION: '+(levels.invalidation!=null?Number(levels.invalidation).toPrecision(10):'—'),
+      'ATR(14): '+(levels.atr14!=null?Number(levels.atr14).toPrecision(10):'—'),
+      'Support: '+(levels.support??'—')+' | Resistance: '+(levels.resistance??'—'),
+      '',
+      'Levels status: '+(levels.available?'READY':'NOT AVAILABLE — '+(levels.reason||'No valid directional setup')),
+      'Reasons: '+[...(agg.reasons_up||[]),...(agg.reasons_down||[])].join(' · '),
+      'Data source: '+(data.data_source||'unknown'),
+      'Execution: DISABLED — analysis only; no orders are placed.'
+    ];
+    $('reason').textContent=levels.available?'MTF setup with indicative entry, stop loss and three targets.':'No valid TP/SL setup; do not treat this as a trade signal.';
+    $('details').textContent=lines.join('\n');
+    $('updated').textContent='MTF updated '+new Date().toLocaleTimeString();
+  }catch(e){
+    $('details').textContent='MTF scan error: '+e.message;
+    $('updated').textContent='MTF scan failed';
+  }finally{button.disabled=false}
+}
 async function scanTop(){
   if(topBusy)return;topBusy=true;$('scanTop').disabled=true;$('topStatus').textContent='Scanning…';
   try{
@@ -207,7 +249,7 @@ async function scanTop(){
   }catch(e){$('topStatus').textContent='Scan error';$('topResults').textContent=e.message}
   finally{topBusy=false;$('scanTop').disabled=false}
 }
-$('scanTop').addEventListener('click',scanTop);$('scan').addEventListener('click',scan);$('connectBybit').addEventListener('click',verifyBybitAccount);$('loadAccounts').addEventListener('click',loadOAuthAccounts);$('createAccount').addEventListener('click',createOAuthAccount);$('startOAuth').addEventListener('click',startOAuth);$('exchangeCode').addEventListener('click',exchangeCode);
+$('scanTop').addEventListener('click',scanTop);$('scan').addEventListener('click',scan);$('scanLevels').addEventListener('click',scanLevels);$('connectBybit').addEventListener('click',verifyBybitAccount);$('loadAccounts').addEventListener('click',loadOAuthAccounts);$('createAccount').addEventListener('click',createOAuthAccount);$('startOAuth').addEventListener('click',startOAuth);$('exchangeCode').addEventListener('click',exchangeCode);
 $('start').addEventListener('click',()=>{if(timer)return;scan();timer=setInterval(scan,15000);$('start').disabled=true;$('stop').disabled=false;$('updated').textContent='Monitoring every 15s'});
 $('stop').addEventListener('click',()=>{if(timer)clearInterval(timer);timer=null;$('start').disabled=false;$('stop').disabled=true;$('updated').textContent='Monitoring stopped'});
 $('clearToken').addEventListener('click',()=>{sessionStorage.removeItem('bybitAgentToken');sessionStorage.removeItem('bybitOAuthAccessToken');sessionStorage.removeItem('bybitOAuthEnvironment');sessionStorage.removeItem('bybitOAuthCodeVerifier');$('oauthToken').value='';$('subaccountSelect').replaceChildren(new Option('Choose an AI subaccount…',''));$('accountStatus').textContent='Not checked';$('accountMessage').textContent='Session credentials cleared.';$('oauthStatus').textContent='Disconnected. Session token cleared.';$('oauthLink').style.display='none';alert('App and Bybit OAuth tokens cleared from this tab.')});
