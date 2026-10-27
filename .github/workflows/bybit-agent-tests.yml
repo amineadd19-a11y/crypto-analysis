@@ -1,0 +1,28 @@
+name: Bybit AI Agent Tests
+
+on:
+  push:
+    paths:
+      - "bybit-agent/**"
+      - ".github/workflows/bybit-agent-tests.yml"
+  pull_request:
+    paths:
+      - "bybit-agent/**"
+      - ".github/workflows/bybit-agent-tests.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: bybit-agent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: bybit-agent/requirements.txt
+      - run: pip install -r requirements.txt
+      - run: python -m unittest discover -s tests -v
+      - run: python -m compileall -q app tests
