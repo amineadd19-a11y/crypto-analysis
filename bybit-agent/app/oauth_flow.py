@@ -100,12 +100,47 @@ def exchange_code(code: str, code_verifier: str, environment: str) -> dict:
         method="POST",
     )
     try:
-        with urlopen(request, timeout=12) as response:
-            payload = json.loads(response.read().decode())
-    except HTTPException:
-        raise
-    except (HTTPError, URLError, TimeoutError, ValueError, json.JSONDecodeError):
-        raise HTTPException(status_code=502, detail="Could not reach Bybit token endpoint.") from None
+        with urlopen(request, timeout=20) as response:
+            raw_body = response.read().decode("utf-8", errors="replace")
+    except HTTPError as exc:
+        # HTTPError means DNS/TLS/connection succeeded and Bybit (or its edge) replied.
+        # Surface only bounded, non-secret provider diagnostics instead of mislabeling it
+        # as a network-connectivity failure.
+        try:
+            error_payload = json.loads(exc.read().decode("utf-8", errors="replace"))
+            ret_code = error_payload.get("retCode", error_payload.get("ret_code"))
+            ret_msg = str(error_payload.get("retMsg", error_payload.get("ret_msg", "")))[:160]
+            provider_detail = f" retCode={ret_code}; {ret_msg}" if ret_code is not None or ret_msg else ""
+        except (ValueError, json.JSONDecodeError):
+            provider_detail = ""
+        raise HTTPException(
+            status_code=502,
+            detail=f"Bybit token endpoint returned HTTP {exc.code}.{provider_detail} Check environment and restart OAuth authorization.",
+        ) from None
+    except (URLError, TimeoutError, OSError) as exc:
+        reason = getattr(exc, "reason", exc)
+        reason_text = str(reason).lower()
+        if "name or service not known" in reason_text or "temporary failure in name resolution" in reason_text or "getaddrinfo failed" in reason_text:
+            diagnosis = "DNS resolution failed"
+        elif "timed out" in reason_text or isinstance(reason, TimeoutError):
+            diagnosis = "connection timed out"
+        elif "ssl" in reason_text or "certificate" in reason_text or "tls" in reason_text:
+            diagnosis = "TLS handshake failed"
+        elif "refused" in reason_text:
+            diagnosis = "connection refused"
+        else:
+            diagnosis = "network connection failed"
+        raise HTTPException(
+            status_code=502,
+            detail=f"Could not connect to Bybit token endpoint ({diagnosis}). Check outbound connectivity from Vercel and retry with a fresh OAuth authorization code.",
+        ) from None
+    try:
+        payload = json.loads(raw_body)
+    except (ValueError, json.JSONDecodeError):
+        raise HTTPException(
+            status_code=502,
+            detail="Bybit token endpoint returned a non-JSON response. Retry with a fresh OAuth authorization code.",
+        ) from None
     ret = payload.get("retCode", payload.get("ret_code", 0))
     token_data = payload.get("result") or payload
     if ret not in (0, "0", None) and not token_data.get("access_token"):
