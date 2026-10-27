@@ -209,3 +209,78 @@ def execute_market_order(body: LiveOrderRequest, confirmation: str) -> dict:
         "execution": "LIVE",
         "note": "Order accepted by Bybit; verify actual fill and protective orders in the exchange UI.",
     }
+
+
+
+def run_auto_cycle(symbol: str, confirmation: str) -> dict:
+    """One scheduler-triggered cycle. Only high-confluence Bybit-native data may trigger an order."""
+    if not re.fullmatch(r"[A-Z0-9]{3,30}", symbol.upper()):
+        raise HTTPException(status_code=422, detail="Invalid symbol.")
+    # Check activation and the independent arming secret before spending time on a scan.
+    if not _enabled():
+        raise HTTPException(status_code=423, detail="Automatic live execution is disabled.")
+    expected = os.getenv("LIVE_TRADING_CONFIRMATION", "").strip()
+    if not expected or not confirmation or not __import__("hmac").compare_digest(expected, confirmation):
+        raise HTTPException(status_code=403, detail="Live-trade confirmation failed.")
+
+    from app.market_data import get_kline
+    from app.mtf_scanner import analyze_symbol_mtf, MTF_INTERVALS
+
+    candles_by_interval = {}
+    latest_1m_timestamp = None
+    for interval in MTF_INTERVALS:
+        response = get_kline(category="linear", symbol=symbol.upper(), interval=interval, limit=200)
+        if response.get("_data_source") != "bybit":
+            raise HTTPException(status_code=503, detail="Bybit market data is blocked or unavailable; fallback prices cannot trigger live orders.")
+        rows = (response.get("result") or {}).get("list") or []
+        if len(rows) > 1:
+            rows = rows[1:]  # Exclude the current, potentially incomplete candle returned first by Bybit.
+        rows = list(reversed(rows))
+        if len(rows) < 60:
+            raise HTTPException(status_code=503, detail=f"Insufficient closed Bybit candles for timeframe {interval}.")
+        candles_by_interval[interval] = rows
+        if interval == "1":
+            try:
+                latest_1m_timestamp = str(rows[-1][0])
+            except (TypeError, IndexError):
+                latest_1m_timestamp = None
+
+    analysis = analyze_symbol_mtf(symbol.upper(), candles_by_interval, data_source="bybit")
+    aggregate = analysis.get("aggregate") or {}
+    levels = analysis.get("levels") or {}
+    direction = aggregate.get("direction")
+    classification = aggregate.get("classification")
+    # Conservative auto mode: only the scanner's strongest, non-countertrend classifications.
+    allowed = {
+        ("long", "STRONG_LONG_CANDIDATE"): "Buy",
+        ("short", "STRONG_SHORT_CANDIDATE"): "Sell",
+    }
+    side = allowed.get((direction, classification))
+    if not side or aggregate.get("conflicts") or aggregate.get("confidence") != "medium_high":
+        return {"submitted": False, "execution": "NO_TRADE", "reason": "Strict auto-entry filters did not pass.", "analysis": analysis}
+    if not levels.get("available"):
+        return {"submitted": False, "execution": "NO_TRADE", "reason": "No valid risk/reward levels; no order submitted.", "analysis": analysis}
+    short_tf = analysis.get("timeframes") or {}
+    volume_values = [
+        (short_tf.get("1m") or {}).get("relative_volume"),
+        (short_tf.get("5m") or {}).get("relative_volume"),
+    ]
+    if not any(isinstance(v, (int, float)) and v >= 3.0 for v in volume_values):
+        return {"submitted": False, "execution": "NO_TRADE", "reason": "No 1m/5m relative-volume spike of at least 3x.", "analysis": analysis}
+
+    # Same closed 1m candle + direction yields same exchange orderLinkId across retries.
+    if not latest_1m_timestamp:
+        raise HTTPException(status_code=503, detail="No reliable closed-candle timestamp; refusing automatic order.")
+    key = f"auto:{symbol.upper()}:{direction}:{latest_1m_timestamp}"
+    request = LiveOrderRequest(
+        symbol=symbol.upper(),
+        side=side,
+        stop_loss=float(levels["stop_loss"]),
+        take_profit=float(levels["tp1"]),
+        idempotency_key=key,
+    )
+    outcome = execute_market_order(request, confirmation)
+    outcome["auto_cycle"] = True
+    outcome["scanner_classification"] = classification
+    outcome["scanner_score"] = aggregate.get("score")
+    return outcome
