@@ -184,44 +184,96 @@ def aggregate_mtf(tf_results: dict[str, dict], cfg: dict | None = None) -> dict[
 
 
 def build_levels(tf_results: dict[str, dict], direction: str, cfg: dict | None = None) -> dict[str, Any]:
+    """Build structure-aware, analysis-only levels; never manufacture a tradable setup."""
     cfg = {**DEFAULT_CFG, **(cfg or {})}
-    primary = None
-    for key in ("15", "5", "60", "1"):
-        if tf_results.get(key, {}).get("status") == "ok":
-            primary = tf_results[key]
-            break
+    primary_key = next((k for k in ("15", "5", "60", "1") if tf_results.get(k, {}).get("status") == "ok"), None)
+    primary = tf_results.get(primary_key) if primary_key else None
     if primary is None or direction not in ("long", "short"):
-        return {"available": False, "reason": "No direction or primary TF"}
+        return {"available": False, "status": "NOT_AVAILABLE", "entry_status": "NO_VALID_DIRECTION", "reason": "No direction or primary timeframe", "execution": "DISABLED"}
+
     price = float(primary["last_close"])
     atr_v = primary.get("atr14")
-    support = primary.get("support")
-    resistance = primary.get("resistance")
-    if atr_v is None or atr_v <= 0:
-        return {"available": False, "reason": "ATR unavailable"}
-    if primary.get("ema50"):
-        dist = abs(price - float(primary["ema50"])) / atr_v
-        if dist > cfg["max_extension_atr"]:
-            return {"available": False, "reason": f"Price extended {dist:.1f} ATR from EMA50 (max {cfg['max_extension_atr']})", "reference_price": price}
-    stop_dist = cfg["atr_stop_mult"] * atr_v
+    support, resistance = primary.get("support"), primary.get("resistance")
+    base = {
+        "available": False, "status": "NOT_AVAILABLE", "entry_status": "WAIT_FOR_BETTER_ENTRY",
+        "reference_price": round(price, 8), "reference_timestamp_ms": primary.get("timestamp_ms"),
+        "atr14": round(float(atr_v), 8) if atr_v is not None else None,
+        "support": support, "resistance": resistance, "execution": "DISABLED",
+    }
+    if atr_v is None or not math.isfinite(float(atr_v)) or float(atr_v) <= 0:
+        return {**base, "reason": "ATR unavailable or invalid; no levels calculated"}
+
+    atr_v = float(atr_v)
+    ema50 = primary.get("ema50")
+    if ema50 and abs(price - float(ema50)) / atr_v > cfg["max_extension_atr"]:
+        dist = abs(price - float(ema50)) / atr_v
+        return {**base, "reason": f"Price extended {dist:.1f} ATR from EMA50 (max {cfg['max_extension_atr']}); wait for price to return toward structure"}
+
+    stop_dist = float(cfg["atr_stop_mult"]) * atr_v
+    if not math.isfinite(stop_dist) or stop_dist <= 0:
+        return {**base, "reason": "Invalid ATR stop distance"}
+
     if direction == "long":
         stop = price - stop_dist
-        if support and support < price:
-            stop = min(stop, float(support) * 0.998)
-        entry_zone = [round(price * 0.999, 8), round(price, 8)]
-        targets = [round(price + stop_dist * rr, 8) for rr in cfg["rr_targets"]]
+        if support is not None and 0 < float(support) < price:
+            stop = min(stop, float(support) - 0.1 * atr_v)
+        risk = price - stop
+        structural_targets = []
+        if resistance is not None and float(resistance) > price:
+            structural_targets.append(float(resistance))
+        # ATR projections are estimates, but do not disguise nearby resistance as a valid target.
+        targets = [price + risk * float(r) for r in cfg["rr_targets"]]
+        target1_rr = (targets[0] - price) / risk if risk > 0 else None
+        pullback_ref = float(ema50) if ema50 is not None else None
+        pullback_zone = [round(pullback_ref - 0.15 * atr_v, 8), round(pullback_ref + 0.15 * atr_v, 8)] if pullback_ref and price < pullback_ref < price + 2 * atr_v else None
+        valid_geometry = stop < price and all(t > price for t in targets)
         invalidation = stop
-        rr = (targets[0] - price) / (price - stop) if price > stop else None
     else:
         stop = price + stop_dist
-        if resistance and resistance > price:
-            stop = max(stop, float(resistance) * 1.002)
-        entry_zone = [round(price, 8), round(price * 1.001, 8)]
-        targets = [round(price - stop_dist * rr, 8) for rr in cfg["rr_targets"]]
+        if resistance is not None and float(resistance) > price:
+            stop = max(stop, float(resistance) + 0.1 * atr_v)
+        risk = stop - price
+        structural_targets = []
+        if support is not None and 0 < float(support) < price:
+            structural_targets.append(float(support))
+        targets = [price - risk * float(r) for r in cfg["rr_targets"]]
+        target1_rr = (price - targets[0]) / risk if risk > 0 else None
+        pullback_ref = float(ema50) if ema50 is not None else None
+        pullback_zone = [round(pullback_ref - 0.15 * atr_v, 8), round(pullback_ref + 0.15 * atr_v, 8)] if pullback_ref and price - 2 * atr_v < pullback_ref < price else None
+        valid_geometry = stop > price and all(0 < t < price for t in targets)
         invalidation = stop
-        rr = (price - targets[0]) / (stop - price) if stop > price else None
-    if rr is not None and rr < cfg["min_rr"]:
-        return {"available": False, "reason": f"Risk/reward {rr:.2f} below minimum {cfg['min_rr']}", "reference_price": price, "indicative_stop": stop}
-    return {"available": True, "reference_price": round(price, 8), "entry_price": round(price, 8), "reference_timestamp_ms": primary.get("timestamp_ms"), "entry_zone": entry_zone, "invalidation": round(invalidation, 8), "stop_loss": round(stop, 8), "take_profit": targets, "tp1": targets[0] if len(targets) > 0 else None, "tp2": targets[1] if len(targets) > 1 else None, "tp3": targets[2] if len(targets) > 2 else None, "risk_reward_first_target": round(rr, 2) if rr else None, "atr14": atr_v, "support": support, "resistance": resistance, "assumptions": [f"ATR stop multiple={cfg['atr_stop_mult']}", f"Targets at R:R {list(cfg['rr_targets'])}", "Fees/slippage not deducted; estimates only", "Not an order instruction"], "execution": "DISABLED"}
+
+    if not valid_geometry or not math.isfinite(risk) or risk <= 0:
+        return {**base, "reason": "Invalid level geometry; entry, stop and targets fail directional validation"}
+    if target1_rr is None or target1_rr < float(cfg["min_rr"]):
+        result = {
+            **base,
+            "reason": f"Risk/reward {target1_rr:.2f} below minimum {cfg['min_rr']}" if target1_rr is not None else "Risk/reward could not be calculated",
+            "indicative_stop": round(stop, 8),
+            "risk_reward_first_target": round(target1_rr, 2) if target1_rr is not None else None,
+        }
+        if pullback_zone:
+            result["suggested_entry_zone"] = pullback_zone
+            result["suggested_entry_note"] = "EMA50-based pullback reference only; wait for price confirmation. Not an active entry."
+        return result
+
+    # Keep projected targets transparent and verify the first target clears the configured RR floor.
+    entry_zone = [round(price * 0.999, 8), round(price, 8)] if direction == "long" else [round(price, 8), round(price * 1.001, 8)]
+    return {
+        "available": True, "status": "VALID_ESTIMATE", "entry_status": "LEVELS_VALID_NOT_AN_ORDER",
+        "reference_price": round(price, 8), "entry_price": round(price, 8),
+        "reference_timestamp_ms": primary.get("timestamp_ms"), "entry_zone": entry_zone,
+        "invalidation": round(invalidation, 8), "stop_loss": round(stop, 8),
+        "take_profit": [round(t, 8) for t in targets],
+        "tp1": round(targets[0], 8) if len(targets) > 0 else None,
+        "tp2": round(targets[1], 8) if len(targets) > 1 else None,
+        "tp3": round(targets[2], 8) if len(targets) > 2 else None,
+        "risk_reward_first_target": round(target1_rr, 2),
+        "atr14": round(atr_v, 8), "support": support, "resistance": resistance,
+        "structural_target_reference": structural_targets[0] if structural_targets else None,
+        "assumptions": [f"ATR stop multiple={cfg['atr_stop_mult']}", f"Targets at R:R {list(cfg['rr_targets'])}", "Fees/slippage not deducted; estimates only", "Targets are projections, not guaranteed fills", "Not an order instruction"],
+        "execution": "DISABLED",
+    }
 
 
 def screen_candidate_from_ticker(symbol: str, last_price: float, change24h_pct: float, turnover24h: float, cfg: dict | None = None) -> dict[str, Any]:
