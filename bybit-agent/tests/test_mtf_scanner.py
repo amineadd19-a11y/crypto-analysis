@@ -106,6 +106,37 @@ class MtfAggregateTests(unittest.TestCase):
         levels = build_levels(tf, "long", {"min_rr": 100, "atr_stop_mult": 1.5, "rr_targets": (1.5,), "max_extension_atr": 10})
         self.assertFalse(levels.get("available"))
 
+    def test_low_structural_rr_waits_instead_of_publishing_levels(self):
+        tf = {
+            "15": {
+                "status": "ok", "last_close": 100.0, "atr14": 1.0,
+                "support": 99.8, "resistance": 100.5,
+                "timestamp_ms": 1, "ema50": 100.0,
+            }
+        }
+        levels = build_levels(tf, "long", {"min_rr": 1.5, "atr_stop_mult": 1.5, "rr_targets": (1.5, 2.5, 4.0), "max_extension_atr": 10})
+        self.assertFalse(levels["available"])
+        self.assertEqual(levels["entry_status"], "WAIT_FOR_BETTER_ENTRY")
+        self.assertIn("Risk/reward", levels["reason"])
+        self.assertEqual(levels["reference_price"], 100.0)
+        self.assertEqual(levels["execution"], "DISABLED")
+
+    def test_short_levels_have_correct_direction(self):
+        tf = {
+            "15": {
+                "status": "ok", "last_close": 100.0, "atr14": 1.0,
+                "support": 90.0, "resistance": 101.0,
+                "timestamp_ms": 1, "ema50": 100.0,
+            }
+        }
+        levels = build_levels(tf, "short", {"min_rr": 1.5, "atr_stop_mult": 1.5, "rr_targets": (1.5, 2.5, 4.0), "max_extension_atr": 10})
+        self.assertTrue(levels["available"])
+        self.assertGreater(levels["stop_loss"], levels["entry_price"])
+        self.assertLess(levels["tp1"], levels["entry_price"])
+        self.assertLess(levels["tp2"], levels["entry_price"])
+        self.assertLess(levels["tp3"], levels["entry_price"])
+        self.assertEqual(levels["execution"], "DISABLED")
+
     def test_trading_always_disabled(self):
         up = _synth_trend()
         out = analyze_symbol_mtf("BTCUSDT", {i: up for i in ("1", "5", "15", "60", "240")})
