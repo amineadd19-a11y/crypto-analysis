@@ -1,25 +1,29 @@
-# Bybit AI Trader — Demo-first agent
+# Bybit AI Trader — guarded autonomous execution
 
-A separate Python service for Bybit USDT perpetual market analysis, with explainable LONG / SHORT / WAIT signals and an OAuth connection flow for Bybit AI Subaccounts. **Order execution remains disabled** until a separately reviewed execution phase adds per-order confirmation and hard risk controls.
+FastAPI service for Bybit USDT perpetual multi-timeframe analysis, OAuth AI-subaccount connection, and a fail-closed live execution API. **Live trading remains OFF by default.** A scheduler must call the auto-cycle endpoint; Vercel request handlers do not provide an always-running background loop.
 
 ## Safety defaults
 
-- Public market-data endpoints require no credentials.
-- OAuth tokens are entered in the dashboard and kept in browser session storage only; the server does not persist them.
-- OAuth account verification retrieves the selected AI subaccount's credentials server-side and never returns the secret to the browser.
-- The dashboard requires an explicit AI subaccount selection; it never auto-selects or auto-creates one.
-- `TRADING_ENABLED=false` by default. No order-submission, withdrawal, or transfer endpoint is implemented.
-- Signals are heuristic, not financial advice, and must be backtested before use.
+- `LIVE_TRADING_ENABLED=false` by default; live orders are rejected unless explicitly armed.
+- `BYBIT_API_KEY` / `BYBIT_API_SECRET` must be dedicated AI-subaccount credentials configured server-side. Credentials are never accepted in order request bodies or returned to the browser.
+- Withdrawals and transfers are not implemented.
+- A separate `LIVE_TRADING_CONFIRMATION` secret is required in the `X-Live-Trade-Confirmation` request header.
+- Mainnet additionally requires `LIVE_MAINNET_ACK=I_UNDERSTAND_REAL_FUNDS`. Prefer testing on TESTNET first.
+- Only one open position per symbol is allowed; market entry requests include exchange-side stop loss and take profit.
+- Order size is limited to at most 0.5% of equity at stop distance and no more than 100% equity notional. `MAX_DAILY_LOSS_USDT` defaults to 5 USDT. Incomplete daily PnL history causes execution to fail closed.
+- Auto-cycle uses only Bybit-native market data. OKX fallback data is never allowed to trigger a Bybit live order.
+- Auto-cycle requires the scanner's strongest non-countertrend signal, medium-high confidence, valid levels, and >=3x relative volume on 1m or 5m.
+- `/api/trading/status` exposes non-secret configuration status. `/api/trading/execute` accepts a strictly validated one-off order. `/api/trading/auto-cycle` performs one scan-and-trade cycle and should only be invoked by a secured scheduler.
+- Protect all endpoints with Vercel Authentication or `REQUIRE_ACCESS_TOKEN=true` plus a strong `AGENT_ACCESS_TOKEN`. Do not expose the auto-cycle route publicly.
+- This software does not guarantee profit. Market orders may slip; attached protective orders must be checked on the exchange after fills. Backtest and testnet-test before mainnet.
 
-## OAuth (required for AI subaccount connection)
+## OAuth
 
-1. On the dashboard, choose MAINNET (default) or TESTNET.
-2. Click **Start Bybit authorization** — this generates the official PKCE authorize URL (`client_id=ai-agent`, `scope=ai-account`).
-3. Authorize on Bybit. On the success page, copy the **OAuth access token** (or the authorization code).
-4. If you received a **code**, paste it and click **Exchange code → token** (uses the `code_verifier` stored in this tab).
-5. Click **Load AI subaccounts**, select one, then **Verify selected account**.
+1. On the dashboard, choose MAINNET or TESTNET and click **Start Bybit authorization**.
+2. Authorize via the official PKCE flow, exchange the code if needed, then load AI subaccounts.
+3. Select and verify the intended AI subaccount explicitly.
 
-Pasting an API key, API secret, or an expired/incomplete token produces Bybit error `50000 Token verify failed`. Always start authorization from the dashboard button so PKCE matches.
+OAuth verification in the current dashboard is read-only and does not persist the returned API credentials. Configure the selected AI subaccount's trading-enabled API key and secret only as Vercel server-side environment variables if using live execution. Never use withdrawal permissions.
 
 ## Run locally
 
@@ -28,19 +32,24 @@ Python 3.11+:
 ```bash
 cd bybit-agent
 python -m venv .venv
-# activate the virtual environment
+# activate the environment
 pip install -r requirements.txt
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Open `/health`, then try `/api/scan?symbol=BTCUSDT&interval=5&limit=200`.
+## Required deployment settings
 
-## Environment
+Start with these safe settings:
+- `LIVE_TRADING_ENABLED=false`
+- `BYBIT_TESTNET=true`
+- `REQUIRE_ACCESS_TOKEN=true`
+- `AGENT_ACCESS_TOKEN=<long random secret>`
+- `LIVE_TRADING_CONFIRMATION=<different long random secret>`
+- `MAX_DAILY_LOSS_USDT=5`
+- `MAX_RISK_PER_TRADE_PCT=0.5`
 
-Copy `.env.example` to `.env` for local development if needed. Public market scanning and the dashboard's OAuth flow do not require `BYBIT_API_KEY` or `BYBIT_API_SECRET`. Never commit access tokens, API keys, or secrets.
+Only after end-to-end testnet verification, a human operator can explicitly configure mainnet credentials, set `BYBIT_TESTNET=false`, set `LIVE_MAINNET_ACK=I_UNDERSTAND_REAL_FUNDS`, and set `LIVE_TRADING_ENABLED=true`. This code does not change those settings automatically.
 
-## Deployment status
+## Monitoring / deployment
 
-The dashboard is deployed at https://bybit-ai-agent.vercel.app from the `feat/bybit-ai-agent-demo` branch. The API is hosted on Vercel using `bybit-agent/vercel.json`.
-
-For public hosting, protect the deployment with Vercel Authentication or enable `REQUIRE_ACCESS_TOKEN=true` and configure a strong `AGENT_ACCESS_TOKEN`. `/health` stays public for health checks. Keep `TRADING_ENABLED=false`: this version has no order-submission endpoints.
+The API is hosted on Vercel using `bybit-agent/vercel.json`. Vercel functions are request-driven, not an always-on process. Configure an external scheduler to call `POST /api/trading/auto-cycle` at the desired cadence with the application access token and separate live-trading confirmation header. Start with a slow cadence on testnet; do not run a public unauthenticated scheduler.
