@@ -188,7 +188,7 @@ register_market_routes(app, client, ALLOWED_INTERVALS, build_signal)
 
 # Live execution endpoints are fail-closed. Trading remains disabled unless deployment
 # settings explicitly arm it and the caller supplies the separate confirmation secret.
-from app.live_execution import LiveOrderRequest, execute_market_order, trading_status
+from app.live_execution import LiveOrderRequest, execute_market_order, run_auto_cycle, trading_status
 
 
 @app.get("/api/trading/status")
@@ -203,3 +203,14 @@ def live_trading_execute(
 ) -> dict:
     confirmation = request.headers.get("x-live-trade-confirmation", "")
     return execute_market_order(body, confirmation)
+
+
+class AutoCycleRequest(BaseModel):
+    symbol: str = Field(default="BTCUSDT", min_length=3, max_length=30, pattern=r"^[A-Z0-9]+$")
+
+
+@app.post("/api/trading/auto-cycle")
+def live_trading_auto_cycle(body: AutoCycleRequest, request: Request) -> dict:
+    """One autonomous scan-and-trade cycle; call from a secured external scheduler."""
+    confirmation = request.headers.get("x-live-trade-confirmation", "")
+    return run_auto_cycle(body.symbol, confirmation)
