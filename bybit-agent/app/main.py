@@ -184,3 +184,22 @@ def bybit_oauth_verify(body: OAuthSelectRequest) -> dict:
 
 from app.market_routes import register_market_routes
 register_market_routes(app, client, ALLOWED_INTERVALS, build_signal)
+
+
+# Live execution endpoints are fail-closed. Trading remains disabled unless deployment
+# settings explicitly arm it and the caller supplies the separate confirmation secret.
+from app.live_execution import LiveOrderRequest, execute_market_order, trading_status
+
+
+@app.get("/api/trading/status")
+def live_trading_status() -> dict:
+    return trading_status()
+
+
+@app.post("/api/trading/execute")
+def live_trading_execute(
+    body: LiveOrderRequest,
+    request: Request,
+) -> dict:
+    confirmation = request.headers.get("x-live-trade-confirmation", "")
+    return execute_market_order(body, confirmation)
