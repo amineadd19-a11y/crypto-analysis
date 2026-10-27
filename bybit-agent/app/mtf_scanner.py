@@ -222,7 +222,9 @@ def build_levels(tf_results: dict[str, dict], direction: str, cfg: dict | None =
         if resistance is not None and float(resistance) > price:
             structural_targets.append(float(resistance))
         # ATR projections are estimates, but do not disguise nearby resistance as a valid target.
-        targets = [price + risk * float(r) for r in cfg["rr_targets"]]
+        targets = [price + stop_dist * float(r) for r in cfg["rr_targets"]]
+        if structural_targets and structural_targets[0] < targets[0]:
+            targets[0] = structural_targets[0]
         target1_rr = (targets[0] - price) / risk if risk > 0 else None
         pullback_ref = float(ema50) if ema50 is not None else None
         pullback_zone = [round(pullback_ref - 0.15 * atr_v, 8), round(pullback_ref + 0.15 * atr_v, 8)] if pullback_ref and price < pullback_ref < price + 2 * atr_v else None
@@ -236,7 +238,9 @@ def build_levels(tf_results: dict[str, dict], direction: str, cfg: dict | None =
         structural_targets = []
         if support is not None and 0 < float(support) < price:
             structural_targets.append(float(support))
-        targets = [price - risk * float(r) for r in cfg["rr_targets"]]
+        targets = [price - stop_dist * float(r) for r in cfg["rr_targets"]]
+        if structural_targets and structural_targets[0] > targets[0]:
+            targets[0] = structural_targets[0]
         target1_rr = (price - targets[0]) / risk if risk > 0 else None
         pullback_ref = float(ema50) if ema50 is not None else None
         pullback_zone = [round(pullback_ref - 0.15 * atr_v, 8), round(pullback_ref + 0.15 * atr_v, 8)] if pullback_ref and price - 2 * atr_v < pullback_ref < price else None
